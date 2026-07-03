@@ -176,77 +176,61 @@ export async function sendInvoice(params) {
     };
   }
 
-  // ── PRODUCTION/TEST MODE ───────────────────────────────────────────────────
-  // Try real SMP lookup via Node42
-  let lookupResult;
+  // ── PRODUCTION MODE ── use Node42's public sendDocument() ──────────────────
   try {
-    lookupResult = await lookupParticipant(receiverId);
-  } catch (lookupErr) {
-    // In offline environments, still record the transaction
-    const tx = {
+    // n42.sendDocument handles: SMP lookup, AS4 build, sign, encrypt, HTTPS POST, MDN receipt
+    const result = await node42.sendViaNode42(sbdhXml, {
+      cert: node42.getCertPaths().cert,
+      key: node42.getCertPaths().key,
+      truststore: node42.getCertPaths().truststore,
+      env: config.mode,
+      dryrun: true, // No PKI certs yet — builds the message but doesn't send it
+    });
+
+    transactions.set(result.messageId, {
+      messageId: result.messageId,
+      direction: 'send',
+      status: result.status,
+      senderId,
+      receiverId,
+      documentType: docType,
+      sbdhXml,
+      ublXml,
+      receiptXml: result.receipt || null,
+      timestamp,
+      completedAt: result.timestamp || timestamp,
+    });
+
+    return {
+      messageId: result.messageId,
+      status: result.status,
+      receipt: result.receipt || null,
+      timestamp: result.timestamp || timestamp,
+    };
+  } catch (err) {
+    // Node42 send failed (no PKI certs). Record as pending.
+    transactions.set(messageId, {
       messageId,
       direction: 'send',
-      status: 'sent',
+      status: 'pending',
       senderId,
       receiverId,
       documentType: docType,
       sbdhXml,
       ublXml,
       timestamp,
-    };
-    transactions.set(messageId, {
-      ...tx,
-      status: 'sent',
-      completedAt: timestamp,
+      error: err.message,
     });
 
     return {
       messageId,
-      status: 'sent',
+      status: 'pending',
       receipt: null,
       timestamp,
-      _note:
-        'Document validated and SBDH prepared. Actual AS4 send requires Peppol network connectivity and PKI certificates.',
+      error: 'send_failed',
+      details: [{ message: err.message }],
     };
   }
-
-  // Build AS4 message
-  const as4Message = buildAS4Message({
-    messageId,
-    fromApId: config.apId,
-    toApId: extractAPId(receiverId),
-    senderParticipantId: senderId,
-    receiverParticipantId: receiverId,
-    payload: sbdhXml,
-    documentType: docType,
-    processId: processId || DEFAULT_PROCESS_ID,
-    timestamp,
-  });
-
-  // Record transaction
-  const tx = {
-    messageId,
-    direction: 'send',
-    status: 'delivered',
-    senderId,
-    receiverId,
-    documentType: docType,
-    sbdhXml,
-    ublXml,
-    as4Message,
-    timestamp,
-    completedAt: timestamp,
-  };
-  transactions.set(messageId, tx);
-
-  return {
-    messageId,
-    status: 'delivered',
-    receipt: null,
-    timestamp,
-    _note:
-      'Document prepared for AS4 transport. In production, a signed MDN receipt from the receiving AP is required for "delivered" status.',
-  };
 }
 
 // ═══════════════════════════════════════════════════════

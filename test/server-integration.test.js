@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createApp } from '../server/index.js';
+import * as apCore from '../src/index.js';
 import { sampleInvoiceData } from './fixtures.js';
 import { generateInvoice } from '../src/ubl/generator.js';
 import http from 'http';
@@ -12,6 +13,9 @@ let server;
 let baseUrl;
 
 beforeAll(async () => {
+  // Enable simulation — no PKI certs available for the Node42 production path
+  apCore.enableSimulation();
+
   await new Promise((resolve) => {
     const app = createApp();
     server = app.listen(0, () => {

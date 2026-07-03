@@ -25,6 +25,9 @@ const {
   handleIncomingMessage,
 } = apCore;
 
+// Enable simulation mode — no PKI certs for actual Node42 AS4 send
+apCore.enableSimulation();
+
 // Sample invoice data
 const sampleInvoiceData = {
   id: 'FA-2026-9999',

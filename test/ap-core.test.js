@@ -20,6 +20,9 @@ const {
 } = apCore;
 
 describe('AP Core Interface', () => {
+  // Enable simulation so sendInvoice doesn't try Node42 (which needs PKI certs)
+  apCore.enableSimulation();
+
   describe('validateDocument', () => {
     it('should validate a correct invoice and return no errors', async () => {
       const xml = generateInvoice(sampleInvoiceData);
