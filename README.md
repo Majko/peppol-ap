@@ -266,19 +266,14 @@ curl http://localhost:3001/api/status/uuid:abc123...@ap.mojafaktura.sk
 ╔══════════════════════════════════════════════╗
 ║         PEPPOL ACCESS POINT CORE             ║
 ║                                              ║
-║  ┌──────────────────────────────────────┐    ║
-║  │  AP Core Interface:                  │    ║
-║  │  sendInvoice · validateDocument      │    ║
-║  │  lookupParticipant · getStatus       │    ║
-║  │  handleIncoming · registerWebhook    │    ║
-║  └──────────────┬───────────────────────┘    ║
-║                 │                             ║
-║  ┌──────────────┴───────────────────────┐    ║
-║  │  Modules:                           │    ║
-║  │  UBL Gen/Parser · Validator (15 rules) │  ║
-║  │  SBDH Envelope · AS4 MIME Message    │    ║
-║  │  Node42 Integration · Simulator      │    ║
-║  └──────────────────────────────────────┘    ║
+║  sendInvoice flow:                           ║
+║    1. validate (our 15-rule validator)        ║
+║    2. generate UBL + build SBDH (our tools)   ║
+║    3. branching:                              ║
+║       simulation → simulator.simulateSend()  ║
+║       production → n42.sendDocument()         ║
+║                    ↑ Node42's PUBLIC API      ║
+║                      (stable across versions) ║
 ╚══════════════════════════════════════════════╝
         │
         ▼
@@ -304,7 +299,8 @@ src/
 └── as4/
     ├── sbdh.js        # SBDH envelope builder/parser
     ├── message.js     # AS4 SOAP/MIME multipart builder/parser
-    └── node42.js      # @n42/edelivery integration layer
+    └── node42.js      # Thin wrappers around Node42's PUBLIC API only
+                       # (lookupParticipant, sendDocument, getCertInfo, getKeyInfo)
 
 server/
 ├── index.js           # Express server (--start / --simulate)
@@ -345,7 +341,9 @@ examples/
 | R066 | Exempt categories (E, AE, K, G) must have rate = 0 | fatal |
 | R067 | Reduced rate (AA) must have rate > 0 | fatal |
 
-Also runs **Node42's official Peppol Schematron** (SaxonJS-based) for additional coverage when available.
+Node42's Schematron is **not used** — it's not part of their public API and would
+break on upgrade. Our validator is independently maintained against the
+Peppol BIS Billing 3.0 specification.
 
 ---
 
