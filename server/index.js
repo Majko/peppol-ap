@@ -144,13 +144,14 @@ export function createApp() {
 
   // ─── POST /api/validate ───────────────────────
 
-  app.post('/api/validate', (req, res) => {
+  app.post('/api/validate', async (req, res) => {
     try {
       const ublXml = req.body?.ublXml || (typeof req.body === 'string' ? req.body : null);
       if (!ublXml) {
         return res.status(400).json({ error: 'bad_request', details: [{ message: 'ublXml is required' }] });
       }
-      res.json(apCore.validateDocument(ublXml));
+      const result = await apCore.validateDocument(ublXml);
+      res.json(result);
     } catch (err) {
       console.error('POST /api/validate error:', err);
       res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });

@@ -34,6 +34,7 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
+    "@n42/edelivery": "^0.2.85",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "fast-xml-parser": "^5.9.3",

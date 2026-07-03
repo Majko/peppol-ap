@@ -285,7 +285,7 @@ test('health check', () => {
 
 testAsync('validate document via AP Core', async () => {
   const xml = generateInvoice(sampleInvoiceData);
-  const result = validateDocument(xml);
+  const result = await validateDocument(xml);
   if (!result.valid) {
     throw new Error('Validation failed:\n  ' +
       result.errors.map((e) => `${e.rule}: ${e.message}`).join('\n  '));

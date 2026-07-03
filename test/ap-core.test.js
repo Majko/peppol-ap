@@ -21,19 +21,19 @@ const {
 
 describe('AP Core Interface', () => {
   describe('validateDocument', () => {
-    it('should validate a correct invoice and return no errors', () => {
+    it('should validate a correct invoice and return no errors', async () => {
       const xml = generateInvoice(sampleInvoiceData);
-      const result = validateDocument(xml);
+      const result = await validateDocument(xml);
 
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should reject an invalid invoice', () => {
+    it('should reject an invalid invoice', async () => {
       const badData = { ...sampleInvoiceData, invoiceTypeCode: '999' };
       const xml = generateInvoice(badData);
 
-      const result = validateDocument(xml);
+      const result = await validateDocument(xml);
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);

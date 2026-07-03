@@ -13,11 +13,14 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 import { generateInvoice, generateCreditNote } from './ubl/generator.js';
 import { parseUBL } from './ubl/parser.js';
 import { validateUBL } from './ubl/validator.js';
 import { buildSBDH, parseSBDH, wrapInSBDH } from './as4/sbdh.js';
 import { buildAS4Message, parseAS4Message } from './as4/message.js';
+import * as node42 from './as4/node42.js';
 
 // In-memory transaction store
 const transactions = new Map();
@@ -364,12 +367,21 @@ export async function lookupParticipant(participantId) {
     );
   }
 
-  // In production, this would:
-  // 1. Query SML via DNS: b-{scheme}-{value}.iso6523-actorid-upis.sml.peppolcentral.org
-  // 2. Get SMP URL from DNS CNAME record
-  // 3. Query SMP for participant metadata
+  // Try real SMP lookup via Node42 (uses DNS + HTTP)
+  if (node42.isAvailable()) {
+    try {
+      const n42Result = await node42.lookupParticipant(participantId, {
+        env: config.mode,
+      });
+      if (n42Result.services?.[0]?.endpoint) {
+        return n42Result;
+      }
+    } catch {
+      // Fall through to simulated lookup
+    }
+  }
 
-  // For now, return simulated response
+  // Simulated fallback
   return {
     participantId,
     smpUrl: `https://smp.${config.apDomain}`,
@@ -379,7 +391,7 @@ export async function lookupParticipant(participantId) {
           'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1',
         process_id: DEFAULT_PROCESS_ID,
         endpoint: `https://ap.${config.apDomain}/as4`,
-        certificate: '-----BEGIN CERTIFICATE-----\nMIIF... (placeholder)\n-----END CERTIFICATE-----',
+        certificate: '(simulated - Node42 not connected to Peppol network)',
       },
     ],
     resolved_at: new Date().toISOString(),
@@ -396,16 +408,37 @@ export async function lookupParticipant(participantId) {
  * @param {string} [schema='peppol'] - Ruleset: 'peppol', 'cen', 'both'
  * @returns {{ valid: boolean, errors: Array<{rule: string, severity: string, message: string, location: string}>, warnings: Array }}
  */
-export function validateDocument(ublXml, schema = 'peppol') {
-  const result = validateUBL(ublXml);
+export async function validateDocument(ublXml, schema = 'peppol') {
+  // Always run our custom validator first (fast, synchronous, comprehensive)
+  const customResult = validateUBL(ublXml);
+  const customFatals = customResult.errors.filter((e) => e.severity === 'fatal');
+  const customWarnings = customResult.errors.filter((e) => e.severity === 'warning');
 
-  const warnings = result.errors.filter((e) => e.severity === 'warning');
-  const fatals = result.errors.filter((e) => e.severity === 'fatal');
+  let n42Errors = [];
+  let n42Source = null;
+
+  // If custom validator passes, also run Node42's Schematron for extra coverage
+  if (customFatals.length === 0 && node42.isAvailable()) {
+    try {
+      const n42Result = await node42.validateWithNode42(ublXml);
+      if (n42Result.source === 'node42-schematron') {
+        n42Errors = n42Result.errors || [];
+        n42Source = 'node42-schematron';
+      }
+    } catch {
+      // Node42 validation failed, rely on custom result
+    }
+  }
+
+  // Merge errors: Node42 fatals are added to custom fatals
+  const n42Fatals = n42Errors.filter((e) => e.severity === 'fatal' || !e.severity);
+  const n42Warnings = n42Errors.filter((e) => e.severity === 'warning');
 
   return {
-    valid: fatals.length === 0,
-    errors: fatals,
-    warnings,
+    valid: customFatals.length === 0 && n42Fatals.length === 0,
+    errors: [...customFatals, ...n42Fatals],
+    warnings: [...customWarnings, ...n42Warnings],
+    source: n42Source ? 'custom+node42' : 'custom',
   };
 }
 
