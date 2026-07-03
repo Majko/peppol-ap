@@ -122,22 +122,25 @@ node server/simulate.js <command> [options]
 
 ### Commands
 
-#### `receive` — Simulate another AP sending an invoice to us
+#### `inbound` — Simulate another AP sending an invoice to us
 
 ```bash
 # Generate and inject a €2,500 invoice from a supplier
-node server/simulate.js receive --sender 9914:SK5599887766 --amount 2500
+node server/simulate.js inbound --sender 9914:SK5599887766 --amount 2500
 
 # Inject from a UBL XML file
-node server/simulate.js receive --file ./invoice.xml
+node server/simulate.js inbound --file ./invoice.xml
 
 # Full example
-node server/simulate.js receive \
+node server/simulate.js inbound \
   --sender 9914:SK5599887766 \
   --receiver 9914:SK2023456789 \
   --amount 1500 \
   --name "Dodávateľ s.r.o."
 ```
+
+> **Alias**: `receive` also works as a shorthand — both `inbound` and `receive`
+> point to the same command.
 
 #### `send` — Simulate sending an invoice (with MDN receipt)
 
