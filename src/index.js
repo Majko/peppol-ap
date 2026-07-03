@@ -449,37 +449,28 @@ export async function lookupParticipant(participantId) {
  * @param {string} [schema='peppol'] - Ruleset: 'peppol', 'cen', 'both'
  * @returns {{ valid: boolean, errors: Array<{rule: string, severity: string, message: string, location: string}>, warnings: Array }}
  */
-export async function validateDocument(ublXml, schema = 'peppol') {
-  // Always run our custom validator first (fast, synchronous, comprehensive)
-  const customResult = validateUBL(ublXml);
-  const customFatals = customResult.errors.filter((e) => e.severity === 'fatal');
-  const customWarnings = customResult.errors.filter((e) => e.severity === 'warning');
-
-  let n42Errors = [];
-  let n42Source = null;
-
-  // If custom validator passes, also run Node42's Schematron for extra coverage
-  if (customFatals.length === 0) {
-    try {
-      const n42Result = await node42.validateWithNode42(ublXml);
-      if (n42Result.source === 'node42') {
-        n42Errors = n42Result.errors || [];
-        n42Source = 'node42';
-      }
-    } catch {
-      // Node42 validation failed, rely on custom result
-    }
-  }
-
-  // Merge errors: Node42 fatals are added to custom fatals
-  const n42Fatals = n42Errors.filter((e) => e.severity === 'fatal' || !e.severity);
-  const n42Warnings = n42Errors.filter((e) => e.severity === 'warning');
+/**
+ * Validate a UBL document against Peppol BIS Billing 3.0 rules.
+ * Uses our comprehensive custom validator (15 rules covering mandatory fields,
+ * cross-field math, VAT category/rate consistency, and code lists).
+ *
+ * Node42's Schematron validation is intentionally NOT used here —
+ * validateDocument is not part of Node42's public API and would break
+ * on upgrade. Our validator is independently maintained.
+ *
+ * @param {string} ublXml - The UBL XML to validate
+ * @returns {{ valid: boolean, errors: Array, warnings: Array, source: string }}
+ */
+export function validateDocument(ublXml) {
+  const result = validateUBL(ublXml);
+  const warnings = result.errors.filter((e) => e.severity === 'warning');
+  const fatals = result.errors.filter((e) => e.severity === 'fatal');
 
   return {
-    valid: customFatals.length === 0 && n42Fatals.length === 0,
-    errors: [...customFatals, ...n42Fatals],
-    warnings: [...customWarnings, ...n42Warnings],
-    source: n42Source ? 'custom+node42' : 'custom',
+    valid: fatals.length === 0,
+    errors: fatals,
+    warnings,
+    source: 'custom',
   };
 }
 
