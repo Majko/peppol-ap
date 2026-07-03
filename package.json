@@ -13,9 +13,17 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "verify": "node examples/verify-standalone.js",
-    "start": "node src/index.js"
+    "start": "node server/index.js --start",
+    "demo": "node examples/demo-accounting-app.js"
   },
-  "keywords": ["peppol", "e-invoicing", "access-point", "ubl", "as4", "bis-billing-3.0"],
+  "keywords": [
+    "peppol",
+    "e-invoicing",
+    "access-point",
+    "ubl",
+    "as4",
+    "bis-billing-3.0"
+  ],
   "author": "",
   "license": "ISC",
   "engines": {
@@ -26,6 +34,8 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "fast-xml-parser": "^5.9.3",
     "sax": "^1.6.0",
     "uuid": "^14.0.1"
