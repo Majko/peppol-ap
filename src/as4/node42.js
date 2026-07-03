@@ -2,13 +2,11 @@
  * Node42 Integration Layer
  *
  * Wraps @n42/edelivery — the pure Node.js Peppol AS4 toolkit.
- * All functions assume Node42 is installed (it's a direct dependency).
  */
 
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-import * as n42 from '@n42/edelivery';
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +38,14 @@ export function getCertPaths() {
 
 // ── Participant Lookup ────────────────────────────────────────────────────────
 
+// Lazy-loaded Node42 (static import at top level would interfere with
+// Node.js event loop when server/index.js is the entry point)
+let _n42 = null;
+async function getN42() {
+  if (!_n42) _n42 = await import('@n42/edelivery');
+  return _n42;
+}
+
 /**
  * Resolve a Peppol participant via real SML→SMP lookup
  *
@@ -58,6 +64,7 @@ export async function lookupParticipant(participantId, opts = {}) {
 
   // Try real SMP lookup via Node42
   try {
+    const n42 = await getN42();
     const context = new n42.N42Context({
       receiverId: normalizeParticipantId(participantId),
       documentType,
@@ -121,6 +128,7 @@ export async function validateWithNode42(ublXml) {
     };
   }
 
+  const n42 = await getN42();
   const context = new n42.N42Context({});
 
   const errors = (await n42.validateDocument?.(context, ublXml, {
@@ -168,6 +176,7 @@ export async function sendViaNode42(sbdhXml, opts = {}) {
     }
   }
 
+  const n42 = await getN42();
   const context = new n42.N42Context({
     cert,
     key,

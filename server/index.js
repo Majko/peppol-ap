@@ -29,7 +29,16 @@ import { generateInvoice, generateCreditNote } from '../src/ubl/generator.js';
 import { parseUBL } from '../src/ubl/parser.js';
 import { buildSBDH } from '../src/as4/sbdh.js';
 import { buildAS4Message } from '../src/as4/message.js';
-import { sampleInvoiceData } from '../test/fixtures.js';
+// Inline sample data (avoids importing test fixtures in production)
+const sampleInvoiceData = {
+  id: 'FA-2026-9999', issueDate: '2026-07-03', invoiceTypeCode: '380', currencyCode: 'EUR',
+  seller: { endpointID: 'SK2023456789', endpointSchemeID: '9914', name: 'Sample s.r.o.', countryCode: 'SK', vatID: 'SK2023456789', legalRegistrationName: 'Sample s.r.o.', companyID: 'SK12345678' },
+  buyer: { endpointID: 'SK4498765432', endpointSchemeID: '9914', name: 'Sample Buyer', countryCode: 'SK', vatID: 'SK4498765432', legalRegistrationName: 'Sample Buyer', companyID: '87654321' },
+  payment: { meansCode: '30', iban: 'SK68...', bic: 'TATRSKBX' },
+  vatBreakdown: [{ taxableAmount: 100, taxAmount: 23, category: 'S', rate: 23 }],
+  monetaryTotal: { lineExtensionAmount: 100, taxExclusiveAmount: 100, taxInclusiveAmount: 123, payableAmount: 123 },
+  lines: [{ id: 1, quantity: 1, unitCode: 'C62', lineExtensionAmount: 100, itemName: 'Sample', vatCategory: 'S', vatRate: 23, priceAmount: 100 }],
+};
 
 /**
  * Create the Express app (without starting the server)
@@ -437,7 +446,7 @@ if (isMain) {
   }
 
   const app = createApp();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     const mode = hasSimulate ? '🔄 SIMULATION' : '🌐 LIVE (requires Peppol network)';
     console.log(`
 ╔══════════════════════════════════════════════════════╗
@@ -458,4 +467,8 @@ if (isMain) {
 ╚══════════════════════════════════════════════════════╝
   `);
   });
+
+  // Graceful shutdown
+  process.on('SIGINT', () => { server.close(); process.exit(0); });
+  process.on('SIGTERM', () => { server.close(); process.exit(0); });
 }
