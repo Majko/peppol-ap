@@ -2,18 +2,28 @@
 /**
  * Peppol AP Core — Simulation CLI
  *
- * CLI tool to simulate Peppol network activity without needing
- * actual Peppol connectivity, PKI certificates, or SML/SMP DNS.
+ * CLI tool for developers to interact with the Peppol AP Core.
+ * No actual Peppol network connectivity, PKI certs, or DNS access needed.
  *
- * Usage:
- *   node server/simulate.js receive [options]     Simulate incoming invoice
- *   node server/simulate.js send [options]        Simulate sending an invoice
- *   node server/simulate.js register [options]    Register a participant
- *   node server/simulate.js participants          List registered participants
+ * Commands:
+ *
+ *   inbound           Simulate an invoice arriving from another Access Point.
+ *                     Builds a real AS4 MIME message and pushes it through
+ *                     the AP Core's receive pipeline. Use this to test
+ *                     how your app handles incoming invoices.
+ *
+ *   send              Smoke-test sending an invoice (same as POST /api/send
+ *                     but auto-generates fake invoice data so you don't have
+ *                     to craft JSON). Returns an MDN receipt.
+ *
+ *   register          Add a trading partner to the simulated network so
+ *                     lookup and send can find them.
+ *
+ *   participants      List everyone registered on the simulated network.
  *
  * Examples:
- *   node server/simulate.js receive --sender 9914:SK5599887766 --file invoice.xml
- *   node server/simulate.js receive --sender 9914:SK5599887766 --amount 1500
+ *   node server/simulate.js inbound --sender 9914:SK5599887766 --amount 1500
+ *   node server/simulate.js inbound --file invoice.xml
  *   node server/simulate.js send --amount 2500 --to 0088:SK4498765432
  *   node server/simulate.js register 9914:SK1122334455 --name "My Supplier"
  */
@@ -25,6 +35,7 @@
  async function main() {
    switch (cmd) {
      case 'receive':
+     case 'inbound':
        return cmdReceive();
      case 'send':
        return cmdSend();
@@ -234,10 +245,18 @@ function help() {
 🇸🇰  Peppol AP Core — Simulation CLI
 
 Usage:
-  node server/simulate.js receive [options]     Simulate incoming invoice (another AP sends to us)
-  node server/simulate.js send [options]        Simulate sending an invoice (we send to another AP)
-  node server/simulate.js register <id> [opts]  Register a participant
-  node server/simulate.js participants          List registered participants
+  inbound  [options]     Simulate an invoice arriving from another AP
+                         (tests the receive pipeline & your webhook)
+  send     [options]     Smoke-test sending (same as POST /api/send,
+                         generates fake data so you don't have to)
+  register <id> [opts]   Register a trading partner on the network
+  participants           List everyone registered
+
+Most useful command — test inbound delivery:
+  node server/simulate.js inbound --sender 9914:SK5599887766 --amount 2500
+
+Smoke test — quick check the AP responds:
+  node server/simulate.js send --amount 999 --to 0088:SK4498765432
 
 Options:
   --sender, --from    Participant ID of the sender     (default: 9914:SK5599887766)
@@ -247,8 +266,8 @@ Options:
   --name              Trading name for the invoice
 
 Examples:
-  node server/simulate.js receive --sender 9914:SK5599887766 --amount 2500
-  node server/simulate.js receive --file ./invoice.xml
+  node server/simulate.js inbound --sender 9914:SK5599887766 --amount 2500
+  node server/simulate.js inbound --file ./invoice.xml
   node server/simulate.js send --amount 999 --to 0088:SK4498765432
   node server/simulate.js register 9914:SK1122334455 --name "My Supplier"
   node server/simulate.js participants

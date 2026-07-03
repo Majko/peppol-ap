@@ -186,8 +186,8 @@ node server/simulate.js participants
 ### NPM Scripts
 
 ```bash
-npm run sim:receive      # node server/simulate.js receive (with defaults)
-npm run sim:send         # node server/simulate.js send (with defaults)
+npm run sim:receive      # node server/simulate.js inbound (simulate another AP sending to us)
+npm run sim:send         # node server/simulate.js send (smoke-test POST /api/send)
 npm run sim:register     # node server/simulate.js register <id>
 npm run sim:participants # node server/simulate.js participants
 ```
@@ -359,8 +359,8 @@ npm run verify        # Standalone verification (16 tests)
 npm start             # Start server (live mode)
 npm run start:sim     # Start server (simulation mode)
 npm run demo          # Accounting app demo
-npm run sim:receive   # CLI: simulate incoming invoice
-npm run sim:send      # CLI: simulate outgoing invoice
+npm run sim:receive   # CLI: simulate inbound invoice (another AP sends to us)
+npm run sim:send      # CLI: smoke-test send endpoint (auto-generates data)
 npm run sim:register  # CLI: register a participant
 npm run sim:participants # CLI: list participants
 ```
