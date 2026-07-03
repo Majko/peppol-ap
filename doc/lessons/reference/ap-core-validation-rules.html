@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AP Core Validation Rules — Reference</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.5; color: #333; max-width: 860px; margin: 0 auto; padding: 3em 2em; background: #fafaf8; }
+  h1 { font-size: 2em; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.35em; margin-top: 2.5em; color: #1e40af; border-bottom: 1px solid #ddd; padding-bottom: 0.2em; }
+  h3 { font-size: 1.1em; margin-top: 1.8em; color: #444; }
+  p { margin: 0.7em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.82em; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.88em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.7em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.35em 0.7em; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: #b91c1c; }
+  .badge { display: inline-block; font-size: 0.72em; padding: 0.1em 0.5em; border-radius: 3px; font-weight: 600; }
+  .badge-M { background: #dbeafe; color: #1e40af; } /* Mandatory */
+  .badge-C { background: #fef3c7; color: #92400e; } /* Conditional */
+  .badge-O { background: #e5e5e5; color: #525252; } /* Optional */
+  .badge-S { background: #d1fae5; color: #065f46; } /* Schematron */
+  .badge-SK { background: #ede9fe; color: #5b21b6; } /* Slovak-specific */
+  .badge-X { background: #fce4ec; color: #c62828; } /* XSD */
+  hr { border: none; border-top: 1px dashed #ccc; margin: 0.5em 0; }
+  .rule-id { font-family: "SF Mono", monospace; font-size: 0.82em; background: #fee; padding: 0.1em 0.4em; border-radius: 3px; }
+  ul, ol { margin: 0.4em 0 0.4em 1.2em; }
+  li { margin: 0.2em 0; }
+</style>
+</head>
+<body>
+
+<h1>✅ AP Core Validation Rules</h1>
+<p><em>What the AP Core checks when you call <code>/api/send</code> or <code>/api/validate</code>.</em></p>
+
+<div class="info">
+  <strong>💡 Two validation layers:</strong>
+  <ul>
+    <li><span class="badge badge-X">XSD</span> — XML Schema: checks structure, cardinality, data types (mechanical, done by the XML parser)</li>
+    <li><span class="badge badge-S">Schematron</span> — Business rules: cross-field logic, code lists, conditional requirements (done by Node42's bundled Schematron engine)</li>
+  </ul>
+  The AP Core runs <strong>both</strong> before accepting any document for transport. This reference documents the Schematron rules in human-readable form.
+</div>
+
+<hr>
+
+<h2>1. Header fields (mandatory)</h2>
+
+<p>These are the absolute minimum fields required by Peppol BIS Billing 3.0. If any of these is missing or invalid, the AP Core rejects the document with <span class="rule-id">PEPPOL-EN16931-R001</span> or similar.</p>
+
+<table>
+  <tr><th>BT#</th><th>Field</th><th>UBL Element</th><th>Rule</th></tr>
+  <tr>
+    <td>—</td>
+    <td>CustomizationID</td>
+    <td><code>/Invoice/cbc:CustomizationID</code></td>
+    <td>Must be exactly <code>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</code>. Any other value → rejection.</td>
+  </tr>
+  <tr>
+    <td>—</td>
+    <td>ProfileID</td>
+    <td><code>/Invoice/cbc:ProfileID</code></td>
+    <td>Must be exactly <code>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</code> for basic billing.</td>
+  </tr>
+  <tr>
+    <td>BT-1</td>
+    <td>Invoice number</td>
+    <td><code>/Invoice/cbc:ID</code></td>
+    <td>Must be present and unique per seller. Free text, max 100 chars typically.</td>
+  </tr>
+  <tr>
+    <td>BT-2</td>
+    <td>Issue date</td>
+    <td><code>/Invoice/cbc:IssueDate</code></td>
+    <td>Format <code>YYYY-MM-DD</code>. Must be a real calendar date.</td>
+  </tr>
+  <tr>
+    <td>BT-3</td>
+    <td>Invoice type code</td>
+    <td><code>/Invoice/cbc:InvoiceTypeCode</code></td>
+    <td>Allowed values: <code>380</code> (invoice), <code>381</code> (credit note), <code>383</code> (corrected), <code>384</code> (self-billed), <code>386</code> (prepayment), <code>389</code> (self-billed credit note).</td>
+  </tr>
+  <tr>
+    <td>BT-5</td>
+    <td>Currency</td>
+    <td><code>/Invoice/cbc:DocumentCurrencyCode</code></td>
+    <td>ISO 4217 code. Only one currency per invoice. Slovak defaults: <code>EUR</code>.</td>
+  </tr>
+  <tr>
+    <td>BT-34</td>
+    <td>Seller endpoint ID</td>
+    <td><code>/Invoice/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID</code></td>
+    <td>Must be a valid Peppol participant ID with <code>@schemeID</code>. For Slovakia: <code>9914:SK2023456789</code>.</td>
+  </tr>
+  <tr>
+    <td>BT-46</td>
+    <td>Buyer endpoint ID</td>
+    <td><code>/Invoice/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID</code></td>
+    <td>Same format as seller endpoint. Must resolve to an existing Peppol participant.</td>
+  </tr>
+  <tr>
+    <td>BT-31</td>
+    <td>Seller VAT ID</td>
+    <td><code>//cac:PartyTaxScheme[cac:TaxScheme/cbc:ID='VAT']/cbc:CompanyID</code></td>
+    <td>Must match the seller's country VAT format. For SK: <code>SK2023456789</code> (SK + 10 digits).</td>
+  </tr>
+  <tr>
+    <td>BT-44</td>
+    <td>Buyer name</td>
+    <td><code>//cac:AccountingCustomerParty//cac:PartyLegalEntity/cbc:RegistrationName</code></td>
+    <td>Required. The full formal name.</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>⚠ AP Core enforces:</strong> If any mandatory (1..1) field is missing, the AP Core returns <code>validation_failed</code> with the XPath of the missing element before attempting any Peppol transport. The invoice never reaches the network.
+</div>
+
+<h2>2. Party identification rules (Slovak-specific)</h2>
+
+<table>
+  <tr><th>Rule</th><th>Description</th><th>Enforced by</th></tr>
+  <tr><td><span class="badge badge-SK">SK</span> Seller country code</td><td><code>//cac:Country/cbc:IdentificationCode</code> for a Slovak seller must be <code>SK</code></td><td>Schematron</td></tr>
+  <tr><td><span class="badge badge-SK">SK</span> VAT number format</td><td>Slovak VAT ID (<code>ic_dph</code>) starts with <code>SK</code> followed by exactly 10 digits</td><td>Schematron</td></tr>
+  <tr><td><span class="badge badge-SK">SK</span> IČO in legal entity</td><td><code>//cac:PartyLegalEntity/cbc:CompanyID</code> should contain the 8-digit IČO</td><td>Recommended</td></tr>
+  <tr><td><span class="badge badge-SK">SK</span> EAS scheme code</td><td><code>@schemeID</code> on <code>EndpointID</code> should be <code>9914</code> (VAT) or <code>0088</code> (GLN). Slovak PASR may mandate one.</td><td>Configurable</td></tr>
+</table>
+
+<h2>3. Monetary totals — cross-field validation</h2>
+
+<p>These are classic Schematron rules. The AP Core's Schematron engine checks every mathematical relationship:</p>
+
+<table>
+  <tr><th>Rule ID</th><th>Check</th><th>What fails it</th></tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R029</span></td>
+    <td><code>BT-112</code> (TaxInclusiveAmount) = <code>BT-109</code> (TaxExclusiveAmount) + <code>BT-110</code> (VAT total)</td>
+    <td>A rounding error or omitted VAT subtotal. Difference > €0.01 → rejection.</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R030</span></td>
+    <td><code>BT-115</code> (PayableAmount) = <code>BT-112</code> (TaxInclusive) − <code>BT-113</code> (Prepaid) + <code>BT-114</code> (Rounding)</td>
+    <td>Prepaid amount deducted but not reflected in PayableAmount.</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R031</span></td>
+    <td><code>BT-106</code> (LineExtensionAmount) = Σ of all <code>BT-131</code> (InvoiceLine net amounts)</td>
+    <td>Line items don't add up to the header total.</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R032</span></td>
+    <td><code>BT-109</code> (TaxExclusive) = <code>BT-106</code> − <code>BT-107</code> (Allowances) + <code>BT-108</code> (Charges)</td>
+    <td>Document-level allowances/charges not reflected in the total.</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R033</span></td>
+    <td><code>BT-110</code> (VAT total) = Σ of all <code>BT-117</code> (TaxSubtotal/TaxAmount)</td>
+    <td>VAT breakdown mismatch.</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R034</span></td>
+    <td>Each <code>BT-131</code> (line net) = <code>BT-129</code> (quantity) × <code>BT-146</code> (unit price) ± line allowances/charges</td>
+    <td>Line item arithmetic error.</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>💰 Practical tip:</strong> These cross-field checks catch most real-world invoice errors. If an SME types €1,200 as the line total but has 10 units at €100, the AP Core catches it. This is why SMEs will pay you — you prevent them from sending invalid invoices that their customer's AP would reject anyway.
+</div>
+
+<h2>4. VAT category and rate rules</h2>
+
+<table>
+  <tr><th>Rule ID</th><th>Check</th><th>Example violation</th></tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R065</span></td>
+    <td>VAT category code <code>S</code> (standard) must have rate &gt; 0</td>
+    <td><code>&lt;cbc:ID&gt;S&lt;/cbc:ID&gt;</code> with <code>&lt;cbc:Percent&gt;0.0&lt;/cbc:Percent&gt;</code> → rejected</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R066</span></td>
+    <td>VAT category code <code>E</code> (exempt), <code>AE</code> (reverse charge), <code>K</code> (IC supply), <code>G</code> (free export) must have rate = 0</td>
+    <td><code>&lt;cbc:ID&gt;E&lt;/cbc:ID&gt;</code> with <code>&lt;cbc:Percent&gt;23.0&lt;/cbc:Percent&gt;</code> → rejected</td>
+  </tr>
+  <tr>
+    <td><span class="rule-id">PEPPOL-EN16931-R067</span></td>
+    <td>VAT category code <code>AA</code> (reduced) must have rate &gt; 0</td>
+    <td>Same logic as standard — reduced doesn't mean zero.</td>
+  </tr>
+  <tr>
+    <td><span class="badge badge-SK">SK</span></td>
+    <td>For Slovak invoices: rate 23.0 → category <code>S</code>. Rate 10.0 → category <code>AA</code>. Other rates are invalid for domestic B2B.</td>
+    <td>Rate 23.0 with category <code>AA</code> → rejected (country-specific rule, can be configured in AP Core)</td>
+  </tr>
+</table>
+
+<h2>5. Conditional requirements (optional but required when...)</h2>
+
+<table>
+  <tr><th>Condition</th><th>What becomes mandatory</th><th>Rule ID</th></tr>
+  <tr>
+    <td>If <code>BT-115</code> (PayableAmount) &gt; 0</td>
+    <td>Either <code>BT-9</code> (DueDate) or <code>BT-20</code> (PaymentTerms/Note) must be present</td>
+    <td><span class="rule-id">PEPPOL-EN16931-R020</span></td>
+  </tr>
+  <tr>
+    <td>If <code>InvoiceTypeCode</code> = 384 (corrected)</td>
+    <td>A <code>BillingReference</code> to the original invoice is required (<code>BT-25</code>, <code>BT-26</code>)</td>
+    <td><span class="rule-id">PEPPOL-EN16931-R008</span></td>
+  </tr>
+  <tr>
+    <td>If a VAT breakdown has category <code>K</code> (IC supply)</td>
+    <td>Actual delivery date (<code>BT-72</code>) or invoice period (<code>BG-14</code>) must be present</td>
+    <td><span class="rule-id">PEPPOL-EN16931-R042</span></td>
+  </tr>
+  <tr>
+    <td>If <code>BT-81</code> (PaymentMeansCode) is 30, 42, or 58 (credit transfer)</td>
+    <td><code>BT-84</code> (IBAN) and <code>BT-86</code> (BIC) must be present</td>
+    <td><span class="rule-id">PEPPOL-EN16931-R050</span></td>
+  </tr>
+  <tr>
+    <td>If there are document-level allowances (<code>BG-20</code>) or charges (<code>BG-21</code>)</td>
+    <td>Each must have a reason (<code>BT-97</code> or <code>BT-98</code>) and a VAT category</td>
+    <td><span class="rule-id">PEPPOL-EN16931-R055</span></td>
+  </tr>
+</table>
+
+<h2>6. Code list validations</h2>
+
+<p>The AP Core rejects any value that is not in the official Peppol code list:</p>
+
+<table>
+  <tr><th>Field</th><th>Allowed codes</th><th>Source</th></tr>
+  <tr><td>Country code</td><td><code>SK</code>, <code>CZ</code>, <code>DE</code>, <code>AT</code>, <code>HU</code>, <code>PL</code> … (ISO 3166-1 alpha-2)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/ISO3166/">ISO 3166</a></td></tr>
+  <tr><td>Currency code</td><td><code>EUR</code>, <code>CZK</code>, <code>HUF</code>, <code>PLN</code>, <code>USD</code> … (ISO 4217)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/ISO4217/">ISO 4217</a></td></tr>
+  <tr><td>VAT category</td><td><code>S</code>, <code>AA</code>, <code>AB</code>, <code>E</code>, <code>AE</code>, <code>K</code>, <code>G</code>, <code>O</code></td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL5305/">UNCL5305</a></td></tr>
+  <tr><td>Invoice type</td><td><code>380</code>, <code>381</code>, <code>383</code>, <code>384</code>, <code>386</code>, <code>389</code></td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL1001-inv/">UNCL1001</a></td></tr>
+  <tr><td>Unit codes</td><td><code>C62</code> (piece), <code>DAY</code>, <code>HUR</code>, <code>KGM</code>, <code>MTR</code>, <code>LTR</code> … (UNECE Rec20)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNECERec20/">Rec20</a></td></tr>
+  <tr><td>Payment means</td><td><code>30</code> (credit transfer), <code>42</code> (bank payment), <code>58</code> (SEPA)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL4461/">UNCL4461</a></td></tr>
+  <tr><td>EAS / schemeID</td><td><code>0088</code> (GLN), <code>0192</code> (BIC), <code>9914</code> (VAT), <code>0130</code> (company reg) …</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/eas/">EAS list</a></td></tr>
+</table>
+
+<h2>7. Document type identifier (the long string)</h2>
+
+<p>One of the most common validation failures. The SBDH <code>DOCUMENTID</code> scope and the AS4 <code>Action</code> field must contain the exact document type identifier for Peppol BIS Billing 3.0:</p>
+
+<pre>urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::
+Invoice##urn:cen.eu:en16931:2017#compliant#
+urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1</pre>
+
+<p>For credit notes, the <code>::Invoice##</code> part is replaced by <code>::CreditNote##</code> (but the namespace stays <code>CreditNote-2</code>). The AP Core constructs this from the document type in the UBL — if the platform sends it incorrectly, the discovery (SMP lookup) will fail because the receiver's SMP won't recognise the document type.</p>
+
+<h2>8. Enforcement summary</h2>
+
+<table>
+  <tr><th>Validation layer</th><th>What is checked</th><th>How it's implemented</th><th>AP Core rejects?</th></tr>
+  <tr><td>XSD</td><td>XML well-formedness, element presence, data types</td><td>XML parser (libxml, sax)</td><td>✅ Yes — structural errors</td></tr>
+  <tr><td>CEN Schematron</td><td>EN 16931 mandatory business rules (cross-field, maths, code lists)</td><td><code>CEN-EN16931-UBL.sch</code></td><td>✅ Yes — all fatal errors</td></tr>
+  <tr><td>Peppol Schematron</td><td>Peppol-specific rules on top of EN 16931</td><td><code>PEPPOL-EN16931-UBL.sch</code></td><td>✅ Yes — all fatal errors</td></tr>
+  <tr><td>Slovak PASR</td><td>Country-specific rules (VAT format, scheme IDs, mandatory fields)</td><td>Custom Schematron or AP Core config</td><td>✅ Yes — when implemented</td></tr>
+  <tr><td>Peppol ID policy</td><td>Participant ID format, document type ID format</td><td>Built into AP Core</td><td>✅ Yes — malformed IDs rejected</td></tr>
+  <tr><td>Mathematical totals</td><td>Line sums, VAT breakdowns, monetary totals</td><td>CEN Schematron</td><td>✅ Yes — rounding mismatches</td></tr>
+</table>
+
+<div class="info">
+  <strong>📁 Where these rules live in Node42:</strong> The library bundles pre-compiled Schematron files at <code>src/assets/schematrons/billing/</code>:
+  <ul>
+    <li><code>cen-en16931-ubl.sef.json</code> — CEN rules (European standard)</li>
+    <li><code>peppol-en16931-ubl.sef.json</code> — Peppol-specific rules</li>
+  </ul>
+  These are loaded at startup and applied to every document in <code>/api/send</code> and <code>/api/validate</code>. You can add Slovak PASR rules as a third Schematron file.
+</div>
+
+<h2>What this means for the Service Platform</h2>
+
+<p>When the platform calls <code>/api/send</code>, the AP Core validates against all of the above before touching the network. The platform <strong>does not need to implement these rules itself</strong> — but if it wants to catch errors before the SME clicks "Send", it can call <code>/api/validate</code> first, which runs the exact same validations.</p>
+
+<p>The validation error response looks like:</p>
+
+<pre>{
+  "error": "validation_failed",
+  "details": [
+    {
+      "rule": "PEPPOL-EN16931-R029",
+      "severity": "fatal",
+      "message": "TaxInclusiveAmount (1656.25) must equal TaxExclusiveAmount (1325.00) + VAT total (330.00)",
+      "location": "/Invoice/cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount"
+    }
+  ]
+}</pre>
+
+<div class="callout">
+  <strong>🔌 Bottom line:</strong> The AP Core's validation contract is as important as its transport contract. The Platform knows: "I send UBL XML → the AP Core either sends it or tells me exactly why it can't." The validation rules above are <strong>not optional</strong> — they're what OpenPeppol requires every AP to enforce, and they're what the Peppol Testbed tests during accreditation.
+</div>
+
+<hr>
+
+<p><a href="./ap-core-interface.html">← AP Core Interface</a> | <a href="../lessons/0004-architecture-and-project-setup.html">Back to Lesson 4</a> | <a href="glossary.html">Glossary</a></p>
+
+</body>
+</html>

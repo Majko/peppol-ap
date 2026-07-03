@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 2: Anatomy of a Peppol Invoice (UBL XML)</title>
+<style>
+  body {
+    font-family: Georgia, "Times New Roman", Times, serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 4em 2em;
+    font-size: 15px;
+    background: #fafaf8;
+  }
+  h1, h2, h3 {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #111;
+  }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  blockquote {
+    border-left: 3px solid #2563eb; margin: 1.2em 0; padding: 0.6em 1em;
+    background: #f0f4ff; font-style: italic; color: #2c3e50;
+  }
+  code {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px;
+  }
+  pre {
+    background: #1e1e2e; color: #cdd6f4;
+    padding: 1em; border-radius: 6px; overflow-x: auto;
+    font-size: 0.78em; line-height: 1.45;
+  }
+  pre .tag { color: #89b4fa; }
+  pre .attr { color: #a6e3a1; }
+  pre .val { color: #f9e2af; }
+  pre .comment { color: #6c7086; font-style: italic; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em;
+  }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout {
+    background: #fffbeb; border-left: 4px solid #f59e0b;
+    padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0;
+  }
+  .callout strong { color: #b45309; }
+  .info {
+    background: #ecfdf5; border-left: 4px solid #10b981;
+    padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0;
+  }
+  .info strong { color: #047857; }
+  .tag { color: #89b4fa; }
+  .attr { color: #a6e3a1; }
+  .val { color: #f9e2af; }
+  .cm { color: #6c7086; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  .badge { display: inline-block; background: #1e40af; color: #fff; font-size: 0.7em; padding: 0.15em 0.6em; border-radius: 3px; }
+  .badge-green { background: #047857; }
+  .badge-amber { background: #b45309; }
+</style>
+</head>
+<body>
+
+<h1>🧾 Lesson 2: Anatomy of a Peppol Invoice</h1>
+<p><em>What a Peppol BIS Billing 3.0 invoice looks like in UBL XML — field by field, with a Slovak example.</em></p>
+
+<hr>
+
+<h2>The big idea</h2>
+
+<p>A Peppol invoice is an <strong>XML document</strong> that follows a strictly defined structure. It's not a PDF — it's machine-readable data that the receiving system processes automatically. The format is <strong>UBL 2.1</strong> (Universal Business Language, ISO/IEC 19845), a standardised XML vocabulary for business documents.</p>
+
+<p>Your Access Point will need to:</p>
+<ul>
+  <li><strong>Generate</strong> valid UBL invoices from your customers' data (or accept them from their accounting software)</li>
+  <li><strong>Validate</strong> them against the Peppol BIS rules before sending</li>
+  <li><strong>Parse</strong> incoming UBL invoices and deliver them to your customers</li>
+</ul>
+
+<div class="info">
+  <strong>💡 Two syntaxes are allowed:</strong> UBL 2.1 XML (most common) and CII (Cross-Industry Invoice). UBL is used in ~95% of Peppol traffic. We focus on UBL.
+</div>
+
+<h2>The Business Groups (BG) model</h2>
+
+<p>The Peppol BIS spec organises invoice data into <strong>Business Groups (BG)</strong> and <strong>Business Terms (BT)</strong>. Each field has a unique BT number. This numbering is consistent across all EU e-invoicing:</p>
+
+<table>
+  <tr><th>BG</th><th>Name</th><th>BT#</th><th>Field</th><th>Card.</th></tr>
+  <tr><td>BG-1</td><td>Invoice header</td><td>BT-1</td><td>Invoice number</td><td>1..1</td></tr>
+  <tr><td>—</td><td>—</td><td>BT-2</td><td>Invoice issue date</td><td>1..1</td></tr>
+  <tr><td>—</td><td>—</td><td>BT-3</td><td>Invoice type code</td><td>1..1</td></tr>
+  <tr><td>BG-4</td><td>Seller</td><td>BT-31</td><td>Seller VAT ID</td><td>1..1</td></tr>
+  <tr><td>BG-7</td><td>Buyer</td><td>BT-44</td><td>Buyer VAT ID</td><td>1..1</td></tr>
+  <tr><td>BG-19</td><td>Payment details</td><td>BT-84</td><td>Payment account (IBAN)</td><td>0..1</td></tr>
+  <tr><td>BG-22</td><td>Document totals</td><td>BT-112</td><td>Total incl. VAT</td><td>1..1</td></tr>
+  <tr><td>BG-25</td><td>Invoice line</td><td>BT-131</td><td>Line net amount</td><td>1..1</td></tr>
+</table>
+
+<p><em>Full list: <a href="https://docs.peppol.eu/poacc/billing/3.0/bis/">docs.peppol.eu/poacc/billing/3.0/bis/</a></em></p>
+
+<h2>A Real Invoice: Slovak Bakery → City Hall</h2>
+
+<p>Here's a Peppol-compliant UBL invoice from a Slovak bakery (IČO: 12345678, DIČ: SK2023456789) invoicing a municipal office. Let's walk through each section:</p>
+
+<pre><span class="cm">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="tag">&lt;Invoice</span> <span class="attr">xmlns</span>=<span class="val">"urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"</span>
+         <span class="attr">xmlns:cac</span>=<span class="val">"urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"</span>
+         <span class="attr">xmlns:cbc</span>=<span class="val">"urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"</span><span class="tag">&gt;</span>
+
+  <span class="cm">&lt;!-- ═════════════ HEADER (BG-1) ═════════════ --&gt;</span>
+
+  <span class="tag">&lt;cbc:CustomizationID&gt;</span>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0<span class="tag">&lt;/cbc:CustomizationID&gt;</span>
+  <span class="tag">&lt;cbc:ProfileID&gt;</span>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0<span class="tag">&lt;/cbc:ProfileID&gt;</span>
+  <span class="tag">&lt;cbc:ID&gt;</span>FA-2026-0042<span class="tag">&lt;/cbc:ID&gt;</span>
+  <span class="tag">&lt;cbc:IssueDate&gt;</span>2026-06-15<span class="tag">&lt;/cbc:IssueDate&gt;</span>
+  <span class="tag">&lt;cbc:DueDate&gt;</span>2026-07-15<span class="tag">&lt;/cbc:DueDate&gt;</span>
+  <span class="tag">&lt;cbc:InvoiceTypeCode&gt;</span>380<span class="tag">&lt;/cbc:InvoiceTypeCode&gt;</span>
+  <span class="tag">&lt;cbc:DocumentCurrencyCode&gt;</span>EUR<span class="tag">&lt;/cbc:DocumentCurrencyCode&gt;</span>
+  <span class="tag">&lt;cbc:BuyerReference&gt;</span>Objednavka-2026/89<span class="tag">&lt;/cbc:BuyerReference&gt;</span>
+</pre>
+
+<table>
+  <tr><th>Element</th><th>BT#</th><th>What it is</th><th>Fixed value?</th></tr>
+  <tr><td><code>CustomizationID</code></td><td>—</td><td>Identifies this as Peppol BIS Billing 3.0 compliant</td><td><strong>Fixed</strong> — always this exact string</td></tr>
+  <tr><td><code>ProfileID</code></td><td>—</td><td>The business process type (billing = 01)</td><td><strong>Fixed</strong> — always this string for basic billing</td></tr>
+  <tr><td><code>ID</code></td><td>BT-1</td><td>Invoice number — unique per seller</td><td>Free text</td></tr>
+  <tr><td><code>IssueDate</code></td><td>BT-2</td><td>Date of issue (YYYY-MM-DD)</td><td>Date</td></tr>
+  <tr><td><code>InvoiceTypeCode</code></td><td>BT-3</td><td>380 = invoice, 381 = credit note, 384 = corrected invoice</td><td>Code</td></tr>
+  <tr><td><code>DocumentCurrencyCode</code></td><td>BT-5</td><td>Currency (ISO 4217)</td><td>Code</td></tr>
+</table>
+
+<div class="info"><strong>Key insight:</strong> <code>CustomizationID</code> and <code>ProfileID</code> are what make this <em>Peppol</em> invoice vs any other UBL invoice. Without them, the receiver cannot tell which rules apply.</div>
+
+<pre>  <span class="cm">&lt;!-- ═════════════ SELLER (BG-4) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:AccountingSupplierParty&gt;</span>
+    <span class="tag">&lt;cac:Party&gt;</span>
+      <span class="cm">&lt;!-- Electronic address (Peppol participant ID) --&gt;</span>
+      <span class="tag">&lt;cbc:EndpointID</span> <span class="attr">schemeID</span>=<span class="val">"0088"</span><span class="tag">&gt;</span>SK2023456789<span class="tag">&lt;/cbc:EndpointID&gt;</span>
+
+      <span class="tag">&lt;cac:PartyName&gt;</span>
+        <span class="tag">&lt;cbc:Name&gt;</span>Pekáreň Pod Hradom s.r.o.<span class="tag">&lt;/cbc:Name&gt;</span>
+      <span class="tag">&lt;/cac:PartyName&gt;</span>
+
+      <span class="tag">&lt;cac:PostalAddress&gt;</span>
+        <span class="tag">&lt;cbc:StreetName&gt;</span>Hlavná 15<span class="tag">&lt;/cbc:StreetName&gt;</span>
+        <span class="tag">&lt;cbc:CityName&gt;</span>Bratislava<span class="tag">&lt;/cbc:CityName&gt;</span>
+        <span class="tag">&lt;cbc:PostalZone&gt;</span>811 01<span class="tag">&lt;/cbc:PostalZone&gt;</span>
+        <span class="tag">&lt;cac:Country&gt;</span>
+          <span class="tag">&lt;cbc:IdentificationCode&gt;</span>SK<span class="tag">&lt;/cbc:IdentificationCode&gt;</span>
+        <span class="tag">&lt;/cac:Country&gt;</span>
+      <span class="tag">&lt;/cac:PostalAddress&gt;</span>
+
+      <span class="tag">&lt;cac:PartyTaxScheme&gt;</span>
+        <span class="tag">&lt;cbc:CompanyID&gt;</span>SK2023456789<span class="tag">&lt;/cbc:CompanyID&gt;</span>
+        <span class="tag">&lt;cac:TaxScheme&gt;</span>
+          <span class="tag">&lt;cbc:ID&gt;</span>VAT<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;/cac:TaxScheme&gt;</span>
+      <span class="tag">&lt;/cac:PartyTaxScheme&gt;</span>
+
+      <span class="tag">&lt;cac:PartyLegalEntity&gt;</span>
+        <span class="tag">&lt;cbc:RegistrationName&gt;</span>Pekáreň Pod Hradom s.r.o.<span class="tag">&lt;/cbc:RegistrationName&gt;</span>
+        <span class="tag">&lt;cbc:CompanyID&gt;</span>SK12345678<span class="tag">&lt;/cbc:CompanyID&gt;</span>
+      <span class="tag">&lt;/cac:PartyLegalEntity&gt;</span>
+    <span class="tag">&lt;/cac:Party&gt;</span>
+  <span class="tag">&lt;/cac:AccountingSupplierParty&gt;</span>
+</pre>
+
+<table>
+  <tr><th>Element</th><th>BT#</th><th>Slovak specifics</th></tr>
+  <tr><td><code>EndpointID</code></td><td>BT-34</td><td>The Peppol participant identifier. In Slovakia, this is typically the VAT number (DIČ with SK prefix). The <code>schemeID</code> "0088" means GS1 identification, but for cross-border EAS codes like "9914" (VAT) may be used — check Slovak PASR.</td></tr>
+  <tr><td><code>PartyTaxScheme/CompanyID</code></td><td>BT-31</td><td>VAT ID: <strong>SK2023456789</strong> (SK + 10-digit DIČ). The <code>TaxScheme/ID</code> must be "VAT".</td></tr>
+  <tr><td><code>PartyLegalEntity/CompanyID</code></td><td>BT-30</td><td>Legal registration ID. For Slovakia: <strong>SK12345678</strong> (SK + 8-digit IČO).</td></tr>
+  <tr><td><code>Country/IdentificationCode</code></td><td>BT-40</td><td>Always "SK" for Slovak entities. ISO 3166-1 alpha-2.</td></tr>
+</table>
+
+<pre>  <span class="cm">&lt;!-- ═════════════ BUYER (BG-7) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:AccountingCustomerParty&gt;</span>
+    <span class="tag">&lt;cac:Party&gt;</span>
+      <span class="tag">&lt;cbc:EndpointID</span> <span class="attr">schemeID</span>=<span class="val">"0088"</span><span class="tag">&gt;</span>SK4498765432<span class="tag">&lt;/cbc:EndpointID&gt;</span>
+
+      <span class="tag">&lt;cac:PartyName&gt;</span>
+        <span class="tag">&lt;cbc:Name&gt;</span>Mesto Trnava<span class="tag">&lt;/cbc:Name&gt;</span>
+      <span class="tag">&lt;/cac:PartyName&gt;</span>
+
+      <span class="tag">&lt;cac:PostalAddress&gt;</span>
+        <span class="tag">&lt;cbc:StreetName&gt;</span>Trojičné námestie 1<span class="tag">&lt;/cbc:StreetName&gt;</span>
+        <span class="tag">&lt;cbc:CityName&gt;</span>Trnava<span class="tag">&lt;/cbc:CityName&gt;</span>
+        <span class="tag">&lt;cbc:PostalZone&gt;</span>917 01<span class="tag">&lt;/cbc:PostalZone&gt;</span>
+        <span class="tag">&lt;cac:Country&gt;</span>
+          <span class="tag">&lt;cbc:IdentificationCode&gt;</span>SK<span class="tag">&lt;/cbc:IdentificationCode&gt;</span>
+        <span class="tag">&lt;/cac:Country&gt;</span>
+      <span class="tag">&lt;/cac:PostalAddress&gt;</span>
+
+      <span class="tag">&lt;cac:PartyTaxScheme&gt;</span>
+        <span class="tag">&lt;cbc:CompanyID&gt;</span>SK4498765432<span class="tag">&lt;/cbc:CompanyID&gt;</span>
+        <span class="tag">&lt;cac:TaxScheme&gt;</span>
+          <span class="tag">&lt;cbc:ID&gt;</span>VAT<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;/cac:TaxScheme&gt;</span>
+      <span class="tag">&lt;/cac:PartyTaxScheme&gt;</span>
+
+      <span class="tag">&lt;cac:PartyLegalEntity&gt;</span>
+        <span class="tag">&lt;cbc:RegistrationName&gt;</span>Mesto Trnava<span class="tag">&lt;/cbc:RegistrationName&gt;</span>
+        <span class="tag">&lt;cbc:CompanyID</span> <span class="attr">schemeID</span>=<span class="val">"0130"</span><span class="tag">&gt;</span>00312316<span class="tag">&lt;/cbc:CompanyID&gt;</span>
+      <span class="tag">&lt;/cac:PartyLegalEntity&gt;</span>
+    <span class="tag">&lt;/cac:Party&gt;</span>
+  <span class="tag">&lt;/cac:AccountingCustomerParty&gt;</span>
+</pre>
+
+<div class="callout">
+  <strong>🇸🇰 Identification schemes (schemeID):</strong> The <code>schemeID</code> on <code>EndpointID</code> identifies which type of identifier is used. Common values:
+  <ul style="margin:0.3em 0;">
+    <li><code>0088</code> — GS1 Global Location Number (GLN) — common for large buyers</li>
+    <li><code>9914</code> — VAT ID (e.g. SK2023456789) — simpler for SMEs</li>
+    <li><code>0192</code> — SWIFT/BIC</li>
+  </ul>
+  Slovak PASR will specify which schemeIDs are acceptable domestically.
+</div>
+
+<pre>  <span class="cm">&lt;!-- ═════════════ ORDER REFERENCE ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:OrderReference&gt;</span>
+    <span class="tag">&lt;cbc:ID&gt;</span>Obj-2026/0042<span class="tag">&lt;/cbc:ID&gt;</span>
+  <span class="tag">&lt;/cac:OrderReference&gt;</span>
+
+  <span class="cm">&lt;!-- ═════════════ DELIVERY (BG-13) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:Delivery&gt;</span>
+    <span class="tag">&lt;cbc:ActualDeliveryDate&gt;</span>2026-06-14<span class="tag">&lt;/cbc:ActualDeliveryDate&gt;</span>
+    <span class="tag">&lt;cac:DeliveryLocation&gt;</span>
+      <span class="tag">&lt;cac:Address&gt;</span>
+        <span class="tag">&lt;cbc:StreetName&gt;</span>Trojičné námestie 1<span class="tag">&lt;/cbc:StreetName&gt;</span>
+        <span class="tag">&lt;cbc:CityName&gt;</span>Trnava<span class="tag">&lt;/cbc:CityName&gt;</span>
+        <span class="tag">&lt;cbc:PostalZone&gt;</span>917 01<span class="tag">&lt;/cbc:PostalZone&gt;</span>
+        <span class="tag">&lt;cac:Country&gt;</span>
+          <span class="tag">&lt;cbc:IdentificationCode&gt;</span>SK<span class="tag">&lt;/cbc:IdentificationCode&gt;</span>
+        <span class="tag">&lt;/cac:Country&gt;</span>
+      <span class="tag">&lt;/cac:Address&gt;</span>
+    <span class="tag">&lt;/cac:DeliveryLocation&gt;</span>
+  <span class="tag">&lt;/cac:Delivery&gt;</span>
+
+  <span class="cm">&lt;!-- ═════════════ PAYMENT (BG-16, BG-17) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:PaymentMeans&gt;</span>
+    <span class="tag">&lt;cbc:PaymentMeansCode&gt;</span>30<span class="tag">&lt;/cbc:PaymentMeansCode&gt;</span>
+    <span class="tag">&lt;cac:PayeeFinancialAccount&gt;</span>
+      <span class="tag">&lt;cbc:ID&gt;</span>SK6811000000001234567890<span class="tag">&lt;/cbc:ID&gt;</span>
+      <span class="tag">&lt;cac:FinancialInstitutionBranch&gt;</span>
+        <span class="tag">&lt;cbc:ID&gt;</span>TATRSKBX<span class="tag">&lt;/cbc:ID&gt;</span>
+      <span class="tag">&lt;/cac:FinancialInstitutionBranch&gt;</span>
+    <span class="tag">&lt;/cac:PayeeFinancialAccount&gt;</span>
+  <span class="tag">&lt;/cac:PaymentMeans&gt;</span>
+</pre>
+
+<table>
+  <tr><th>Element</th><th>BT#</th><th>Notes</th></tr>
+  <tr><td><code>PaymentMeansCode</code></td><td>BT-81</td><td>30 = credit transfer. Most common. Other options: 42 (payment to bank account), 58 (SEPA credit transfer).</td></tr>
+  <tr><td><code>PayeeFinancialAccount/ID</code></td><td>BT-84</td><td>IBAN — the full IBAN including country prefix. Slovak IBANs start with SK68 or similar.</td></tr>
+  <tr><td><code>FinancialInstitutionBranch/ID</code></td><td>BT-86</td><td>BIC/SWIFT code. TATRSKBX = Tatra banka.</td></tr>
+</table>
+
+<pre>  <span class="cm">&lt;!-- ═════════════ VAT BREAKDOWN (BG-23) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:TaxTotal&gt;</span>
+    <span class="tag">&lt;cbc:TaxAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>529.00<span class="tag">&lt;/cbc:TaxAmount&gt;</span>
+
+    <span class="cm">&lt;!-- 23% standard rate --&gt;</span>
+    <span class="tag">&lt;cac:TaxSubtotal&gt;</span>
+      <span class="tag">&lt;cbc:TaxableAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>2000.00<span class="tag">&lt;/cbc:TaxableAmount&gt;</span>
+      <span class="tag">&lt;cbc:TaxAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>460.00<span class="tag">&lt;/cbc:TaxAmount&gt;</span>
+      <span class="tag">&lt;cac:TaxCategory&gt;</span>
+        <span class="tag">&lt;cbc:ID&gt;</span>S<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;cbc:Percent&gt;</span>23.0<span class="tag">&lt;/cbc:Percent&gt;</span>
+        <span class="tag">&lt;cac:TaxScheme&gt;</span>
+          <span class="tag">&lt;cbc:ID&gt;</span>VAT<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;/cac:TaxScheme&gt;</span>
+      <span class="tag">&lt;/cac:TaxCategory&gt;</span>
+    <span class="tag">&lt;/cac:TaxSubtotal&gt;</span>
+
+    <span class="cm">&lt;!-- 10% reduced rate --&gt;</span>
+    <span class="tag">&lt;cac:TaxSubtotal&gt;</span>
+      <span class="tag">&lt;cbc:TaxableAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>690.00<span class="tag">&lt;/cbc:TaxableAmount&gt;</span>
+      <span class="tag">&lt;cbc:TaxAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>69.00<span class="tag">&lt;/cbc:TaxAmount&gt;</span>
+      <span class="tag">&lt;cac:TaxCategory&gt;</span>
+        <span class="tag">&lt;cbc:ID&gt;</span><strong>AA</strong><span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;cbc:Percent&gt;</span>10.0<span class="tag">&lt;/cbc:Percent&gt;</span>
+        <span class="tag">&lt;cac:TaxScheme&gt;</span>
+          <span class="tag">&lt;cbc:ID&gt;</span>VAT<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;/cac:TaxScheme&gt;</span>
+      <span class="tag">&lt;/cac:TaxCategory&gt;</span>
+    <span class="tag">&lt;/cac:TaxSubtotal&gt;</span>
+  <span class="tag">&lt;/cac:TaxTotal&gt;</span>
+</pre>
+
+<table>
+  <tr><th>VAT Category Code</th><th>Meaning</th><th>Slovak rate</th></tr>
+  <tr><td><code>S</code></td><td>Standard rate</td><td><strong>23%</strong> (most goods and services)</td></tr>
+  <tr><td><code>AA</code></td><td>Lower/reduced rate</td><td><strong>10%</strong> (food, medicine, books)</td></tr>
+  <tr><td><code>AB</code></td><td>Reduced rate (second)</td><td>Not used in SK yet</td></tr>
+  <tr><td><code>E</code></td><td>Exempt from VAT</td><td>0% (healthcare, education, finance)</td></tr>
+  <tr><td><code>AE</code></td><td>Reverse charge</td><td>0% (B2B construction, etc.)</td></tr>
+  <tr><td><code>K</code></td><td>Intra-community supply</td><td>0% (EU B2B)</td></tr>
+</table>
+
+<div class="callout">
+  <strong>⚠ Critical validation rule:</strong> The <code>TaxCategory/ID</code> + <code>Percent</code> combination must be correct. If you declare "S" (standard) and the rate doesn't match the country's standard rate, the receiving system will reject the invoice. For Slovakia post-2025, standard rate is <strong>23%</strong>.
+</div>
+
+<pre>  <span class="cm">&lt;!-- ═════════════ MONETARY TOTALS (BG-22) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:LegalMonetaryTotal&gt;</span>
+    <span class="tag">&lt;cbc:LineExtensionAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>2400.00<span class="tag">&lt;/cbc:LineExtensionAmount&gt;</span>
+    <span class="tag">&lt;cbc:TaxExclusiveAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>2690.00<span class="tag">&lt;/cbc:TaxExclusiveAmount&gt;</span>
+    <span class="tag">&lt;cbc:TaxInclusiveAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>3219.00<span class="tag">&lt;/cbc:TaxInclusiveAmount&gt;</span>
+    <span class="tag">&lt;cbc:AllowanceTotalAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>50.00<span class="tag">&lt;/cbc:AllowanceTotalAmount&gt;</span>
+    <span class="tag">&lt;cbc:ChargeTotalAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>340.00<span class="tag">&lt;/cbc:ChargeTotalAmount&gt;</span>
+    <span class="tag">&lt;cbc:PayableAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>3219.00<span class="tag">&lt;/cbc:PayableAmount&gt;</span>
+  <span class="tag">&lt;/cac:LegalMonetaryTotal&gt;</span>
+</pre>
+
+<table>
+  <tr><th>Field</th><th>BT#</th><th>Formula</th></tr>
+  <tr><td>LineExtensionAmount</td><td>BT-106</td><td>Σ (all <code>InvoiceLine/LineExtensionAmount</code>) = sum of line totals before VAT</td></tr>
+  <tr><td>TaxExclusiveAmount</td><td>BT-109</td><td>BT-106 − allowances + charges = total without VAT</td></tr>
+  <tr><td>TaxInclusiveAmount</td><td>BT-112</td><td>BT-109 + BT-110 (VAT amount) = total with VAT</td></tr>
+  <tr><td>PayableAmount</td><td>BT-115</td><td>BT-112 − prepaid amount + rounding = what they must pay</td></tr>
+</table>
+
+<div class="info"><strong>💡 Cross-check rule:</strong> <code>TaxInclusiveAmount</code> must equal <code>TaxExclusiveAmount</code> + sum of all <code>TaxSubtotal/TaxAmount</code>. If they don't match, the invoice fails validation.</div>
+
+<pre>  <span class="cm">&lt;!-- ═════════════ INVOICE LINE 1 (BG-25) ═════════════ --&gt;</span>
+  <span class="tag">&lt;cac:InvoiceLine&gt;</span>
+    <span class="tag">&lt;cbc:ID&gt;</span>1<span class="tag">&lt;/cbc:ID&gt;</span>
+    <span class="tag">&lt;cbc:InvoicedQuantity</span> <span class="attr">unitCode</span>=<span class="val">"KGM"</span><span class="tag">&gt;</span>100<span class="tag">&lt;/cbc:InvoicedQuantity&gt;</span>
+    <span class="tag">&lt;cbc:LineExtensionAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>2000.00<span class="tag">&lt;/cbc:LineExtensionAmount&gt;</span>
+    <span class="tag">&lt;cac:Item&gt;</span>
+      <span class="tag">&lt;cbc:Name&gt;</span>Ražný chlieb 1kg<span class="tag">&lt;/cbc:Name&gt;</span>
+      <span class="tag">&lt;cac:OriginCountry&gt;</span>
+        <span class="tag">&lt;cbc:IdentificationCode&gt;</span>SK<span class="tag">&lt;/cbc:IdentificationCode&gt;</span>
+      <span class="tag">&lt;/cac:OriginCountry&gt;</span>
+      <span class="tag">&lt;cac:ClassifiedTaxCategory&gt;</span>
+        <span class="tag">&lt;cbc:ID&gt;</span>AA<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;cbc:Percent&gt;</span>10.0<span class="tag">&lt;/cbc:Percent&gt;</span>
+        <span class="tag">&lt;cac:TaxScheme&gt;</span>
+          <span class="tag">&lt;cbc:ID&gt;</span>VAT<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;/cac:TaxScheme&gt;</span>
+      <span class="tag">&lt;/cac:ClassifiedTaxCategory&gt;</span>
+    <span class="tag">&lt;/cac:Item&gt;</span>
+    <span class="tag">&lt;cac:Price&gt;</span>
+      <span class="tag">&lt;cbc:PriceAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>20.00<span class="tag">&lt;/cbc:PriceAmount&gt;</span>
+    <span class="tag">&lt;/cac:Price&gt;</span>
+  <span class="tag">&lt;/cac:InvoiceLine&gt;</span>
+  <span class="tag">&lt;cac:InvoiceLine&gt;</span>
+    <span class="tag">&lt;cbc:ID&gt;</span>2<span class="tag">&lt;/cbc:ID&gt;</span>
+    <span class="tag">&lt;cbc:InvoicedQuantity</span> <span class="attr">unitCode</span>=<span class="val">"DAY"</span><span class="tag">&gt;</span>5<span class="tag">&lt;/cbc:InvoicedQuantity&gt;</span>
+    <span class="tag">&lt;cbc:LineExtensionAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>400.00<span class="tag">&lt;/cbc:LineExtensionAmount&gt;</span>
+    <span class="tag">&lt;cac:Item&gt;</span>
+      <span class="tag">&lt;cbc:Name&gt;</span>Catering - obedové menu<span class="tag">&lt;/cbc:Name&gt;</span>
+      <span class="tag">&lt;cac:ClassifiedTaxCategory&gt;</span>
+        <span class="tag">&lt;cbc:ID&gt;</span>S<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;cbc:Percent&gt;</span>23.0<span class="tag">&lt;/cbc:Percent&gt;</span>
+        <span class="tag">&lt;cac:TaxScheme&gt;</span>
+          <span class="tag">&lt;cbc:ID&gt;</span>VAT<span class="tag">&lt;/cbc:ID&gt;</span>
+        <span class="tag">&lt;/cac:TaxScheme&gt;</span>
+      <span class="tag">&lt;/cac:ClassifiedTaxCategory&gt;</span>
+    <span class="tag">&lt;/cac:Item&gt;</span>
+    <span class="tag">&lt;cac:Price&gt;</span>
+      <span class="tag">&lt;cbc:PriceAmount</span> <span class="attr">currencyID</span>=<span class="val">"EUR"</span><span class="tag">&gt;</span>80.00<span class="tag">&lt;/cbc:PriceAmount&gt;</span>
+    <span class="tag">&lt;/cac:Price&gt;</span>
+  <span class="tag">&lt;/cac:InvoiceLine&gt;</span>
+<span class="tag">&lt;/Invoice&gt;</span>
+</pre>
+
+<h2>Validation: Two layers</h2>
+
+<p>Every Peppol invoice goes through two validation stages:</p>
+
+<h3>1. XSD Schema validation</h3>
+<p>Checks the XML structure — are all required elements present? Are the data types correct? Is the nesting right? This is mechanical and handled by your XML parser.</p>
+
+<h3>2. Schematron rules</h3>
+<p>This is where the <em>business logic</em> lives. Schematron is a rule-based validation language. It catches errors like:</p>
+<ul>
+  <li>"If VAT category is 'Standard', the rate must be the country's standard rate"</li>
+  <li>"PayableAmount must equal TaxInclusiveAmount − PrepaidAmount + RoundingAmount"</li>
+  <li>"If InvoiceTypeCode is 384 (corrected invoice), a BillingReference to the original invoice is required"</li>
+  <li>"At least one of BuyerReference or PurchaseOrderReference must be present"</li>
+</ul>
+
+<p>OpenPeppol publishes two Schematron files you must run:</p>
+<ul>
+  <li><a href="https://docs.peppol.eu/poacc/billing/3.0/files/CEN-EN16931-UBL.sch"><code>CEN-EN16931-UBL.sch</code></a> — the European standard rules (EN 16931)</li>
+  <li><a href="https://docs.peppol.eu/poacc/billing/3.0/files/PEPPOL-EN16931-UBL.sch"><code>PEPPOL-EN16931-UBL.sch</code></a> — Peppol-specific additional rules</li>
+</ul>
+
+<h2>The two envelopes</h2>
+
+<p>The UBL XML above is the <strong>payload</strong>. Before it travels over AS4, it gets wrapped in two more layers:</p>
+
+<div class="diagram" style="background:#fff;border:2px solid #ddd;border-radius:8px;padding:1em;margin:1em 0;font-family:'SF Mono','Fira Code',monospace;font-size:0.85em;line-height:1.5;">
+  AS4 Message (SOAP + WS-Security)
+  └── SBDH (Standard Business Document Header)
+      ├── Sender ID:     <em>0088:SK2023456789</em>
+      ├── Receiver ID:   <em>0088:SK4498765432</em>
+      ├── Document Type: <em>urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##...</em>
+      └── Document:      &lt;Invoice&gt;...&lt;/Invoice&gt;  (the UBL XML)
+</div>
+
+<p><strong>SBDH</strong> tells the receiving AP: "Who sent this, who should get it, what type of document is inside." This is essential for routing. More on this in Lesson 3 (AS4).</p>
+
+<hr>
+
+<h2>✅ You can now explain</h2>
+<ol>
+  <li>The structure of a Peppol UBL invoice — header, seller, buyer, VAT breakdown, totals, lines</li>
+  <li>How the BT (Business Term) numbering maps to XML elements</li>
+  <li>Slovak-specific fields: IČO in <code>PartyLegalEntity</code>, DIČ in <code>PartyTaxScheme</code>, SK country code</li>
+  <li>The two validation layers: XSD (structure) and Schematron (business rules)</li>
+  <li>The three-layer packaging: UBL payload → SBDH envelope → AS4 message</li>
+  <li>VAT category codes (S=23%, AA=10%, E=exempt, etc.) and their Slovak rates</li>
+</ol>
+
+<h2>📚 Recommended next steps</h2>
+<ul>
+  <li><strong>Play with the <a href="https://docs.peppol.eu/poacc/billing/3.0/syntax/ubl-invoice/tree/">UBL Invoice Tree</a></strong> — click through every element to see its cardinality, description, and validation rules</li>
+  <li><strong>Download the example files</strong> from <a href="https://docs.peppol.eu/poacc/billing/3.0/files/BIS-Billing3-Examples.zip">docs.peppol.eu/poacc/billing/3.0/files/BIS-Billing3-Examples.zip</a></li>
+  <li><strong>Download the Schematron files</strong> and try running them against a sample invoice (there are Node.js Schematron validators like <code>xsd-schematron</code>)</li>
+  <li><strong>Read the full BIS spec:</strong> <a href="https://docs.peppol.eu/poacc/billing/3.0/bis/">Peppol BIS Billing 3.0 — BIS document</a></li>
+</ul>
+
+<h2>🤔 Questions?</h2>
+<p>Before we move to Lesson 3 (AS4 messaging — how this XML actually gets sent across the network), what's unclear? Want me to zoom in on any particular field, the Schematron rules, or how this maps to your PostgreSQL schema?</p>
+
+<div class="footer">
+  <p>Lesson 2 of the Peppol Service Provider series. Next: <em>Lesson 3: AS4 Messaging — How Invoices Travel the Network</em>.</p>
+  <p>See also: <a href="../reference/glossary.html">Glossary of Peppol Terms</a> | <a href="../reference/ubl-invoice-reference.html">UBL Invoice Quick Reference</a></p>
+</div>
+
+</body>
+</html>

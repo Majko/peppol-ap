@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 4: High-Level Architecture &amp; Project Setup</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.78em; line-height: 1.45; }
+  pre .tag { color: #89b4fa; }
+  pre .attr { color: #a6e3a1; }
+  pre .val { color: #f9e2af; }
+  pre .cm { color: #6c7086; font-style: italic; }
+  pre .k { color: #cba6f7; } /* SQL keywords */
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .diagram { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.2em; margin: 1.2em 0; font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .file { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.85em; background: #eef2ff; padding: 0.1em 0.4em; border-radius: 3px; }
+  .badge { display: inline-block; background: #1e40af; color: #fff; font-size: 0.65em; padding: 0.15em 0.5em; border-radius: 3px; vertical-align: middle; }
+  .badge-green { background: #047857; }
+  .badge-amber { background: #b45309; }
+  .badge-red { background: #dc2626; }
+</style>
+</head>
+<body>
+
+<h1>🏗️ Lesson 4: High-Level Architecture &amp; Project Setup</h1>
+<p><em>The system design — components, database, API routes, and project structure.</em></p>
+
+<hr>
+
+<h2>The big picture</h2>
+
+<p>You're building two things that sit on the same server but are logically separate:</p>
+
+<ol>
+  <li><strong>The Peppol Access Point (AP) Core</strong> — the certified transport layer that speaks AS4 with the Peppol network</li>
+  <li><strong>The Service Platform</strong> — your product: a multi-tenant web portal + API that SMEs use to send/receive invoices</li>
+</ol>
+
+<p>The AP Core exposes a <strong>clean internal interface</strong>. Your portal uses it — but <em>any</em> portal, accounting software, or third-party system could connect to it too.</p>
+
+<div class="diagram">
+                          ┌──────────────────────────────┐
+                          │       PEPPOL NETWORK         │
+                          │    (other APs, SMP, SML)     │
+                          └──────────┬───────────────────┘
+                                     │
+                          AS4 over HTTPS (port 443)
+                                     │
+                                     ▼
+  ╔══════════════════════════════════════════════════════════╗
+  ║    YOUR PEPPOL ACCESS POINT CORE  (certified part)      ║
+  ║                                                         ║
+  ║  ┌──────────────────────────────────────────────────┐   ║
+  ║  │  Node42 AS4 Engine                               │   ║
+  ║  │                                                   │   ║
+  ║  │  • AS4 send/receive on port 443                   │   ║
+  ║  │  • SML/SMP discovery                              │   ║
+  ║  │  • PKI cert management                            │   ║
+  ║  │  • Signing &amp; encryption                            │   ║
+  ║  │  • SBDH envelope handling                         │   ║
+  ║  │  • Schematron validation                          │   ║
+  ║  │  • MDN receipt generation/verification             │   ║
+  ║  └──────────────────────┬───────────────────────────┘   ║
+  ╚═════════════════════════╪═══════════════════════════════╝
+                            │
+               ╔════════════╪════════════════════╗
+               ║  INTERNAL  │  API BOUNDARY      ║
+               ║            │                     ║
+               ║  ┌─────────┴──────────────────┐  ║
+               ║  │  AP Core exposes:          │  ║
+               ║  │                            │  ║
+               ║  │  sendUBL(company, doc)     │  ║
+               ║  │  onReceive(callback)        │  ║
+               ║  │  lookupParticipant(id)      │  ║
+               ║  │  validateUBL(xml)           │  ║
+               ║  │  getTransactionStatus(id)   │  ║
+               ║  └─────────────────────────────┘  ║
+               ╚═══════════════════════════════════╝
+                            │
+                            ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │              YOUR SERVICE PLATFORM  (your product)            │
+  │                                                               │
+  │  ┌──────────────────────┐   ┌──────────────────────────────┐ │
+  │  │  React Portal (Vite) │   │  Express API Server          │ │
+  │  │                      │   │                              │ │
+  │  │  • Login/register    │   │  /api/portal/*  (browser)    │ │
+  │  │  • Dashboard         │   │  /api/integration/* (API)    │ │
+  │  │  • Invoice form      │   │  /api/admin/*    (you)       │ │
+  │  │  • Document viewer   │   │                              │ │
+  │  │  • Settings          │   │  PostgreSQL (7 tables)       │ │
+  │  └──────────┬───────────┘   └──────────────┬───────────────┘ │
+  │             │                               │                 │
+  │             └──────────┬────────────────────┘                 │
+  │                        │                                      │
+  │                 ┌──────▼──────┐                               │
+  │                 │ PostgreSQL  │                               │
+  │                 │ (companies, │                               │
+  │                 │  users,     │                               │
+  │                 │  documents, │                               │
+  │                 │  lines,     │                               │
+  │                 │  api_keys,  │                               │
+  │                 │  audit_log) │                               │
+  │                 └─────────────┘                               │
+  └──────────────────────────────────────────────────────────────┘
+           │                                      ▲
+           │ React SPA                             │ REST/API calls
+           ▼                                      │
+  ┌──────────────────┐              ┌──────────────────────────┐
+  │  SME's Browser   │              │  SME's Accounting SW     │
+  │  (your portal)   │              │  (any 3rd party tool)    │
+  └──────────────────┘              └──────────────────────────┘
+           │                                      ▲
+           │                                      │
+           └────────── OR another portal ──────────┘
+                (built by a third party, using
+                 your integration API)
+</div>
+
+<h2>Physical deployment: same server or separate?</h2>
+
+<p>The diagrams above show both systems on one machine. For your <strong>prototype (4 weeks)</strong>, that's exactly what you should do — everything on a single $10 VPS.</p>
+
+<p>But in <strong>production</strong>, you'll want them on separate servers. Here's why and how:</p>
+
+<h3>Option A: Single server (prototype)</h3>
+
+<div class="diagram">
+  ┌────────────────────────────────────────────┐
+  │           one VPS (e.g. Hetzner)           │
+  │                                            │
+  │  Port 443 ─── AS4 Engine (Node42)          │
+  │  Port 80  ─── Nginx → React static files   │
+  │  Port 3000 ── Express API (internal)        │
+  │  Port 5432 ── PostgreSQL                    │
+  │                                            │
+  │  Domain: ap.mojafaktura.sk                 │
+  └────────────────────────────────────────────┘
+</div>
+
+<p>Pros: simple, cheap, easy to debug. Cons: if the portal goes down due to a bug, the AP also goes down.</p>
+
+<h3>Option B: Separate servers (production)</h3>
+
+<div class="diagram">
+  ┌─────────────────────────────────┐   ┌─────────────────────────────┐
+  │  AP Core Server                 │   │  Service Platform Server   │
+  │  (minimal, hardened)            │   │  (full web app)            │
+  │                                 │   │                             │
+  │  • Only what's needed:          │   │  • Express API              │
+  │    Node42 + small relay daemon  │   │  • React portal (Vite)      │
+  │                                 │   │  • PostgreSQL               │
+  │  • Port 443: AS4 (Peppol)       │   │  • Admin dashboard          │
+  │  • Port 3001: Internal API*     │   │  • Background job queue     │
+  │                                 │   │                             │
+  │  Domain: ap.mojafaktura.sk      │   │  Domain: app.mojafaktura.sk │
+  └──────────────┬──────────────────┘   └─────────────┬───────────────┘
+                 │                                    │
+                 │         Internal API                │
+                 │  (authenticated, over HTTPS         │
+                 │   or private network)               │
+                 │                                    │
+                 │  AP Core → Platform:                │
+                 │  "Invoice received for SK449..."    │
+                 │                                     │
+                 │  Platform → AP Core:                │
+                 │  "Send this UBL to SK449..."        │
+                 │                                     │
+                 └──────────┬─────────────────────────┘
+                            │
+                            ▼
+                  ┌─────────────────────┐
+                  │  Redis or message   │
+                  │  queue (optional)   │
+                  └─────────────────────┘
+</div>
+
+<p>What the AP Core server does when physically separated:</p>
+<ul>
+  <li><strong>Inbound:</strong> receives AS4 message → extracts UBL → calls your Platform's webhook (<code>POST https://app.mojafaktura.sk/api/webhook/invoice-received</code>) with the parsed invoice</li>
+  <li><strong>Outbound:</strong> your Platform calls the AP Core's internal API (<code>POST https://ap.mojafaktura.sk:3001/api/send</code>) with the UBL XML and target participant ID</li>
+  <li><strong>Certificate management:</strong> AP Core holds the private keys. Platform never touches them.</li>
+</ul>
+
+<div class="callout">
+  <strong>🔐 Security benefit of separation:</strong> The AP Core server is <strong>hardened and minimal</strong>. It runs one process, has no database, no user management, no React — just the AS4 engine and a tiny relay API. Fewer moving parts = smaller attack surface. If the Platform server gets compromised, the attacker still can't access your Peppol private keys.
+</div>
+
+<h3>Recommended approach for your 4-week timeline</h3>
+
+<table>
+  <tr><th>Phase</th><th>Architecture</th><th>When</th></tr>
+  <tr><td>Prototype</td><td>Single server (everything together)</td><td>Weeks 1-3</td></tr>
+  <tr><td>Pre-production</td><td>Split into two servers</td><td>Week 4</td></tr>
+  <tr><td>Production</td><td>Two servers + message queue + monitoring</td><td>After accreditation</td></tr>
+</table>
+
+<h2>Project structure</h2>
+
+<pre><span class="k">pepoll-access/</span>
+├── <span class="tag">server/</span>                  <span class="cm">// Express backend</span>
+│   ├── <span class="tag">src/</span>
+│   │   ├── <span class="tag">index.js</span>           <span class="cm">// App entry point</span>
+│   │   ├── <span class="tag">config.js</span>         <span class="cm">// Env vars, constants</span>
+│   │   ├── <span class="tag">db/</span>
+│   │   │   ├── <span class="tag">pool.js</span>         <span class="cm">// pg Pool</span>
+│   │   │   ├── <span class="tag">migrations/</span>     <span class="cm">// SQL migration files</span>
+│   │   │   └── <span class="tag">seeds/</span>         <span class="cm">// Test data</span>
+│   │   ├── <span class="tag">routes/</span>
+│   │   │   ├── <span class="tag">auth.js</span>
+│   │   │   ├── <span class="tag">companies.js</span>
+│   │   │   ├── <span class="tag">documents.js</span>
+│   │   │   ├── <span class="tag">integration.js</span>  <span class="cm">// API for accounting SW</span>
+│   │   │   └── <span class="tag">admin.js</span>
+│   │   ├── <span class="tag">as4/</span>               <span class="cm">// AS4 engine wrapper</span>
+│   │   │   ├── <span class="tag">sender.js</span>       <span class="cm">// Node42-based send</span>
+│   │   │   ├── <span class="tag">receiver.js</span>    <span class="cm">// AS4 receive handler</span>
+│   │   │   ├── <span class="tag">lookup.js</span>      <span class="cm">// SML + SMP resolution</span>
+│   │   │   └── <span class="tag">certificates.js</span>
+│   │   ├── <span class="tag">ubl/</span>
+│   │   │   ├── <span class="tag">generator.js</span>   <span class="cm">// Build UBL XML from JSON</span>
+│   │   │   ├── <span class="tag">parser.js</span>      <span class="cm">// Parse UBL XML → JSON</span>
+│   │   │   └── <span class="tag">validator.js</span>   <span class="cm">// Schematron validation</span>
+│   │   ├── <span class="tag">middleware/</span>
+│   │   │   ├── <span class="tag">auth.js</span>        <span class="cm">// JWT verification</span>
+│   │   │   ├── <span class="tag">tenant.js</span>      <span class="cm">// Multi-tenant isolation</span>
+│   │   │   └── <span class="tag">error.js</span>       <span class="cm">// Error handler</span>
+│   │   └── <span class="tag">services/</span>
+│   │       ├── <span class="tag">company.js</span>
+│   │       ├── <span class="tag">document.js</span>
+│   │       └── <span class="tag">peppol.js</span>     <span class="cm">// Orchestrates send flow</span>
+│   ├── <span class="tag">package.json</span>
+│   └── <span class="tag">.env</span>
+│
+├── <span class="tag">client/</span>                  <span class="cm">// Vite + React portal</span>
+│   ├── <span class="tag">src/</span>
+│   │   ├── <span class="tag">App.jsx</span>
+│   │   ├── <span class="tag">pages/</span>
+│   │   │   ├── <span class="tag">Login.jsx</span>
+│   │   │   ├── <span class="tag">Dashboard.jsx</span>
+│   │   │   ├── <span class="tag">Documents.jsx</span>
+│   │   │   ├── <span class="tag">NewInvoice.jsx</span>
+│   │   │   └── <span class="tag">Settings.jsx</span>
+│   │   ├── <span class="tag">components/</span>
+│   │   │   ├── <span class="tag">Layout.jsx</span>
+│   │   │   ├── <span class="tag">InvoiceForm.jsx</span>
+│   │   │   ├── <span class="tag">DocumentList.jsx</span>
+│   │   │   └── <span class="tag">StatusBadge.jsx</span>
+│   │   └── <span class="tag">api.js</span>           <span class="cm">// API client</span>
+│   ├── <span class="tag">index.html</span>
+│   ├── <span class="tag">package.json</span>
+│   └── <span class="tag">vite.config.js</span>
+│
+├── <span class="tag">serve.sh</span>                 <span class="cm">// Start HTTP server</span>
+├── <span class="tag">kill-server.sh</span>
+├── <span class="tag">lessons/</span>                 <span class="cm">// Your learning materials</span>
+└── <span class="tag">reference/</span>               <span class="cm">// Cheat sheets</span></pre>
+
+<h2>PostgreSQL schema</h2>
+
+<h3>companies</h3>
+<pre><span class="k">CREATE TABLE</span> companies (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            TEXT NOT NULL,                 <span class="cm">-- obchodné meno</span>
+  legal_name      TEXT NOT NULL,                 <span class="cm">-- registration name</span>
+  ico             TEXT NOT NULL UNIQUE,          <span class="cm">-- IČO: 12345678</span>
+  dic             TEXT,                          <span class="cm">-- DIČ: 2023456789</span>
+  ic_dph          TEXT,                          <span class="cm">-- IČ DPH: SK2023456789</span>
+  street          TEXT,
+  city            TEXT,
+  zip             TEXT,
+  country         TEXT DEFAULT 'SK',
+  
+  peppol_id       TEXT UNIQUE,                   <span class="cm">-- Peppol participant ID</span>
+  endpoint_scheme TEXT DEFAULT '9914',           <span class="cm">-- EAS code</span>
+
+  iban            TEXT,                          <span class="cm">-- default IBAN</span>
+  bic             TEXT,                          <span class="cm">-- default BIC</span>
+
+  is_active       BOOLEAN DEFAULT true,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);</pre>
+
+<h3>users</h3>
+<pre><span class="k">CREATE TABLE</span> users (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id      UUID NOT NULL REFERENCES companies(id),
+  email           TEXT NOT NULL UNIQUE,
+  password_hash   TEXT NOT NULL,                  <span class="cm">-- bcrypt</span>
+  name            TEXT NOT NULL,
+  role            TEXT DEFAULT 'admin',           <span class="cm">-- admin, accountant</span>
+  is_active       BOOLEAN DEFAULT true,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);</pre>
+
+<h3>documents</h3>
+<pre><span class="k">CREATE TABLE</span> documents (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id        UUID NOT NULL REFERENCES companies(id),
+  
+  direction         TEXT NOT NULL CHECK (direction IN ('outbound','inbound')),
+  doc_type          TEXT NOT NULL CHECK (doc_type IN ('invoice','credit_note')),
+  status            TEXT NOT NULL DEFAULT 'draft'
+                    CHECK (status IN ('draft','validated','sent','received',
+                                      'delivered','rejected','error')),
+
+  <span class="cm">-- Invoice identifiers</span>
+  invoice_number    TEXT NOT NULL,                 <span class="cm">-- BT-1</span>
+  issue_date        DATE NOT NULL,                 <span class="cm">-- BT-2</span>
+  due_date          DATE,                          <span class="cm">-- BT-9</span>
+  invoice_type_code TEXT DEFAULT '380',             <span class="cm">-- BT-3</span>
+  currency          TEXT DEFAULT 'EUR',             <span class="cm">-- BT-5</span>
+
+  <span class="cm">-- Counterparty (the other end, not our customer)</span>
+  counterparty_name    TEXT,
+  counterparty_ic_dph TEXT,                        <span class="cm">-- their VAT ID</span>
+  counterparty_peppol_id TEXT,
+
+  <span class="cm">-- Monetary totals</span>
+  line_extension_amount  NUMERIC(12,2),
+  tax_exclusive_amount   NUMERIC(12,2),
+  tax_inclusive_amount   NUMERIC(12,2),
+  payable_amount         NUMERIC(12,2),
+
+  <span class="cm">-- Peppol tracking</span>
+  peppol_message_id   TEXT,                        <span class="cm">-- from AS4 message</span>
+  sbdh_xml            TEXT,                        <span class="cm">-- stored SBDH envelope</span>
+  ubl_xml             TEXT,                        <span class="cm">-- the actual UBL XML</span>
+  receipt_xml         TEXT,                        <span class="cm">-- MDN receipt</span>
+
+  created_at          TIMESTAMPTZ DEFAULT now(),
+  sent_at             TIMESTAMPTZ,
+  delivered_at        TIMESTAMPTZ,
+
+  UNIQUE(company_id, invoice_number)
+);</pre>
+
+<h3>document_lines</h3>
+<pre><span class="k">CREATE TABLE</span> document_lines (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id       UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+  line_number       INT NOT NULL,
+  description       TEXT,
+  quantity          NUMERIC(12,4) NOT NULL,
+  unit_code         TEXT DEFAULT 'C62',            <span class="cm">-- C62=piece, DAY, HUR, KGM</span>
+  unit_price        NUMERIC(12,4) NOT NULL,
+  net_amount        NUMERIC(12,2) NOT NULL,
+  vat_category      TEXT DEFAULT 'S',              <span class="cm">-- S, AA, E, AE, K</span>
+  vat_rate          NUMERIC(5,2) NOT NULL,
+  UNIQUE(document_id, line_number)
+);</pre>
+
+<h3>transactions (AS4 message log)</h3>
+<pre><span class="k">CREATE TABLE</span> transactions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id       UUID REFERENCES documents(id),
+  company_id        UUID REFERENCES companies(id),
+
+  message_id        TEXT NOT NULL,                 <span class="cm">-- eb:MessageId</span>
+  direction         TEXT NOT NULL CHECK (direction IN ('send','receive')),
+  status            TEXT DEFAULT 'pending'
+                    CHECK (status IN ('pending','sent','acknowledged',
+                                      'failed','error')),
+
+  <span class="cm">-- Peppol parties</span>
+  sender_ap_id      TEXT,                          <span class="cm">-- C2 AP identifier</span>
+  receiver_ap_id    TEXT,                          <span class="cm">-- C3 AP identifier</span>
+  sender_participant_id   TEXT,                    <span class="cm">-- C1</span>
+  receiver_participant_id TEXT,                    <span class="cm">-- C4</span>
+
+  <span class="cm">-- Raw protocol data (for debugging)</span>
+  request_soap      TEXT,
+  response_soap     TEXT,
+  receipt_xml       TEXT,
+  error_message     TEXT,
+
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  completed_at      TIMESTAMPTZ
+);</pre>
+
+<h3>api_keys (for accounting software integration)</h3>
+<pre><span class="k">CREATE TABLE</span> api_keys (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id        UUID NOT NULL REFERENCES companies(id),
+  key_hash          TEXT NOT NULL,                 <span class="cm">-- sha256 of the raw key</span>
+  key_prefix        TEXT NOT NULL,                 <span class="cm">-- first 8 chars for identification</span>
+  name              TEXT,                          <span class="cm">-- "My accounting SW"</span>
+  is_active         BOOLEAN DEFAULT true,
+  last_used_at      TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ DEFAULT now()
+);</pre>
+
+<h3>audit_log</h3>
+<pre><span class="k">CREATE TABLE</span> audit_log (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id        UUID REFERENCES companies(id),
+  user_id           UUID REFERENCES users(id),
+  action            TEXT NOT NULL,                 <span class="cm">-- 'invoice.sent', 'user.login', etc.</span>
+  metadata          JSONB,
+  ip_address        INET,
+  created_at        TIMESTAMPTZ DEFAULT now()
+);</pre>
+
+<div class="info">
+  <strong>💡 Multi-tenancy strategy:</strong> Every table has a <code>company_id</code>. The tenant middleware reads the JWT token, extracts the company, and adds <code>WHERE company_id = ?</code> to every query automatically. This keeps SMEs completely isolated from each other.
+</div>
+
+<h2>Express API routes</h2>
+
+<table>
+  <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+  <tr style="background:#eef2ff"><td colspan="3"><strong>Portal API (for the React frontend)</strong></td></tr>
+  <tr><td>POST</td><td><code>/api/auth/login</code></td><td>Login, returns JWT</td></tr>
+  <tr><td>POST</td><td><code>/api/auth/register</code></td><td>Register new SME</td></tr>
+  <tr><td>GET</td><td><code>/api/companies/me</code></td><td>Get own company profile</td></tr>
+  <tr><td>PATCH</td><td><code>/api/companies/me</code></td><td>Update company details</td></tr>
+  <tr><td>GET</td><td><code>/api/documents</code></td><td>List documents (filter: direction, status, date)</td></tr>
+  <tr><td>GET</td><td><code>/api/documents/:id</code></td><td>Get single document with lines</td></tr>
+  <tr><td>POST</td><td><code>/api/documents</code></td><td>Create new invoice draft</td></tr>
+  <tr><td>PUT</td><td><code>/api/documents/:id</code></td><td>Update draft</td></tr>
+  <tr><td>POST</td><td><code>/api/documents/:id/send</code></td><td><strong>Send via Peppol</strong> (triggers AS4)</td></tr>
+  <tr><td>GET</td><td><code>/api/documents/:id/ubl</code></td><td>Download UBL XML</td></tr>
+  <tr><td>GET</td><td><code>/api/documents/:id/pdf</code></td><td>Download PDF (generated from UBL)</td></tr>
+
+  <tr style="background:#eef2ff"><td colspan="3"><strong>Integration API (for accounting software)</strong></td></tr>
+  <tr><td>POST</td><td><code>/api/integration/invoices</code></td><td>Push an invoice → Peppol</td></tr>
+  <tr><td>GET</td><td><code>/api/integration/invoices</code></td><td>Pull received invoices</td></tr>
+  <tr><td>GET</td><td><code>/api/integration/invoices/:id/ubl</code></td><td>Download UBL XML</td></tr>
+  <tr><td>POST</td><td><code>/api/integration/webhook</code></td><td>Callback URL for status updates</td></tr>
+
+  <tr style="background:#eef2ff"><td colspan="3"><strong>Admin API (for you)</strong></td></tr>
+  <tr><td>GET</td><td><code>/api/admin/companies</code></td><td>List all companies</td></tr>
+  <tr><td>GET</td><td><code>/api/admin/transactions</code></td><td>View AS4 transaction log</td></tr>
+  <tr><td>POST</td><td><code>/api/admin/certificates</code></td><td>Upload PKI certificates</td></tr>
+  <tr><td>GET</td><td><code>/api/admin/stats</code></td><td>Dashboard stats for you</td></tr>
+</table>
+
+<h2>Key flows</h2>
+
+<h3>Outbound invoice (SME → Peppol)</h3>
+<ol>
+  <li>SME creates invoice in the React portal (or pushes via integration API)</li>
+  <li>Express saves it as <code>draft</code> in the database</li>
+  <li>SME clicks "Send" → Express calls <code>services/peppol.js</code></li>
+  <li><code>peppol.js</code> does:
+    <ol style="list-style-type: lower-alpha;">
+      <li><strong>Validate</strong> the UBL XML against Schematron (Node42 validator)</li>
+      <li><strong>Look up</strong> the receiver via SML + SMP (Node42 lookup)</li>
+      <li><strong>Build</strong> the SBDH envelope + AS4 SOAP message</li>
+      <li><strong>Sign</strong> with your AP's Peppol PKI certificate</li>
+      <li><strong>Encrypt</strong> with the receiving AP's public key</li>
+      <li><strong>POST</strong> the MIME multipart message to the receiver's endpoint</li>
+      <li><strong>Receive and verify</strong> the signed receipt (MDN)</li>
+    </ol>
+  </li>
+  <li>Document status changes to <code>sent</code> or <code>delivered</code></li>
+  <li>Transaction is logged for audit trail</li>
+</ol>
+
+<h3>Inbound invoice (Peppol → SME)</h3>
+<ol>
+  <li>Another AP sends an AS4 message to your server's endpoint</li>
+  <li>Express's <code>/as4/receive</code> handler:
+    <ol style="list-style-type: lower-alpha;">
+      <li>Parses the SOAP envelope</li>
+      <li>Validates the sender's signature against their Peppol certificate (from the SMP)</li>
+      <li>Decrypts the payload using your private key</li>
+      <li>Extracts the SBDH + UBL document</li>
+      <li>Looks up which of your customers has the matching Peppol participant ID</li>
+      <li>Validates the UBL with Schematron</li>
+      <li>Saves as <code>inbound</code> document in the database</li>
+      <li>Sends back a signed MDN receipt</li>
+    </ol>
+  </li>
+  <li>Your SME customer sees the invoice in their portal inbox</li>
+</ol>
+
+<h2>What belongs to the AP Core vs what's yours</h2>
+
+<table>
+  <tr><th>Component</th><th>Part of AP?</th><th>Certified?</th><th>Notes</th></tr>
+  <tr>
+    <td>AS4 send/receive (port 443)</td>
+    <td><strong>AP Core</strong></td>
+    <td>✅ Yes</td>
+    <td>This is what Peppol tests during accreditation</td>
+  </tr>
+  <tr>
+    <td>SML/SMP discovery</td>
+    <td><strong>AP Core</strong></td>
+    <td>✅ Yes</td>
+    <td>Must resolve participants correctly</td>
+  </tr>
+  <tr>
+    <td>PKI certificate handling</td>
+    <td><strong>AP Core</strong></td>
+    <td>✅ Yes</td>
+    <td>Must use Peppol-issued certs</td>
+  </tr>
+  <tr>
+    <td>Schematron validation</td>
+    <td><strong>AP Core</strong></td>
+    <td>✅ Yes</td>
+    <td>Must reject invalid documents before sending</td>
+  </tr>
+  <tr>
+    <td>MDN receipt generation</td>
+    <td><strong>AP Core</strong></td>
+    <td>✅ Yes</td>
+    <td>Mandatory for all APs</td>
+  </tr>
+  <tr>
+    <td colspan="4" style="background:#eef2ff; font-style: italic;">─── The AP certification boundary ───</td>
+  </tr>
+  <tr>
+    <td>React portal (login, forms, dashboard)</td>
+    <td><strong>Service Platform</strong></td>
+    <td>❌ No</td>
+    <td>Your product — any portal can replace it</td>
+  </tr>
+  <tr>
+    <td>Multi-tenant PostgreSQL (companies, users)</td>
+    <td><strong>Service Platform</strong></td>
+    <td>❌ No</td>
+    <td>Your business logic</td>
+  </tr>
+  <tr>
+    <td>Integration API for accounting SW</td>
+    <td><strong>Service Platform</strong></td>
+    <td>❌ No</td>
+    <td>Your added value — lets 3rd parties connect</td>
+  </tr>
+  <tr>
+    <td>PDF generation, email notifications</td>
+    <td><strong>Service Platform</strong></td>
+    <td>❌ No</td>
+    <td>Nice-to-have features</td>
+  </tr>
+  <tr>
+    <td>Billing &amp; subscription management</td>
+    <td><strong>Service Platform</strong></td>
+    <td>❌ No</td>
+    <td>Your business model</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>🔌 The interface between them:</strong> The AP Core exposes a small set of operations that the Service Platform (or any other system) can call:
+  <ul style="margin:0.3em 0">
+    <li><code>send(invoice)</code> — push a UBL invoice to any Peppol participant</li>
+    <li><code>receive(callback)</code> — register where incoming documents are delivered</li>
+    <li><code>getStatus(messageId)</code> — check if a sent message was delivered</li>
+    <li><code>lookup(participantId)</code> — resolve a Peppol ID to endpoint + certificate</li>
+    <li><code>validate(ublXml)</code> — Schematron validation with detailed error report</li>
+  </ul>
+  <p style="margin:0.5em 0 0 0"><strong>→ See the full API spec with request/response formats at <a href="../reference/ap-core-interface.html">reference/ap-core-interface.html</a></strong></p>
+  <p style="margin:0.3em 0 0 0">This means your React portal is just <em>one possible client</em>. An accounting software vendor could build their own portal on the same AP Core using the same interface.</p>
+</div>
+
+<h2>What Node42 gives you (the AP Core)</h2>
+
+<p>The <a href="https://github.com/node42-dev/node42-edelivery">node42-edelivery</a> package does most of the heavy lifting for the AP Core. Here's how it maps to your architecture:</p>
+
+<table>
+  <tr><th>Your component</th><th>Node42 module</th><th>What it provides</th></tr>
+  <tr><td><code>as4/sender.js</code></td><td><code>src/sender/</code></td><td>AS4 message construction, signing, encryption, MIME assembly, HTTP POST, receipt handling</td></tr>
+  <tr><td><code>as4/receiver.js</code></td><td><code>src/receiver/</code></td><td>Parse incoming AS4, verify signature, decrypt, generate MDN</td></tr>
+  <tr><td><code>as4/lookup.js</code></td><td><code>src/lookup.js</code></td><td>SML DNS resolution + SMP metadata query</td></tr>
+  <tr><td><code>ubl/validator.js</code></td><td>Bundled Schematron files</td><td>Pre-compiled Schematron rules in <code>src/assets/schematrons/billing/</code></td></tr>
+  <tr><td><code>as4/certificates.js</code></td><td><code>src/security/</code></td><td>PKI trust chain, crypto operations</td></tr>
+</table>
+
+<div class="callout">
+  <strong>⚡ Prototype strategy:</strong>
+  <ol>
+    <li>Use Node42 as a CLI tool first — test that you can <em>send a Peppol message</em> in the test environment</li>
+    <li>Then integrate it as a library in your Express backend — wrap the sender/receiver in your service layer</li>
+    <li>Build the React portal + PostgreSQL on top — these are straightforward CRUD with your existing stack skills</li>
+    <li>Add the integration API last — it's just REST endpoints wrapping the same service layer</li>
+  </ol>
+</div>
+
+<h2>Getting started checklist</h2>
+
+<table>
+  <tr><th>Step</th><th>What to do</th><th>Est.</th></tr>
+  <tr><td>1</td><td><code>npm init</code> the <code>server/</code> and <code>client/</code> projects</td><td>1h</td></tr>
+  <tr><td>2</td><td>Set up PostgreSQL with the schema above (write migration files)</td><td>2h</td></tr>
+  <tr><td>3</td><td>Build Express: auth, company CRUD, tenant middleware</td><td>4h</td></tr>
+  <tr><td>4</td><td>Build React: login, dashboard, document list, invoice form</td><td>6h</td></tr>
+  <tr><td>5</td><td>Install Node42, test sending a Peppol message via CLI</td><td>2h</td></tr>
+  <tr><td>6</td><td>Integrate Node42 sender into Express (<code>/documents/:id/send</code>)</td><td>3h</td></tr>
+  <tr><td>7</td><td>Build AS4 receiver endpoint (<code>POST /as4/receive</code>)</td><td>3h</td></tr>
+  <tr><td>8</td><td>Build integration API for accounting software</td><td>3h</td></tr>
+  <tr><td>9</td><td>Add PDF generation from UBL XML, email notifications</td><td>3h</td></tr>
+  <tr><td>10</td><td>Deploy, test against Peppol testbed</td><td>3h</td></tr>
+  <tr><td colspan="2" style="text-align:right"><strong>Total</strong></td><td><strong>~30h</strong></td></tr>
+</table>
+
+<div class="info">
+  <strong>🎯 Within your 4-week timeline:</strong> At 30 hours of focused work, you can have a working prototype in a week and a half. The remaining 2.5 weeks are for polishing, testbed accreditation, and the legal paperwork.
+</div>
+
+<hr>
+
+<h2>✅ You can now explain</h2>
+<ol>
+  <li>The full system architecture: one server with Express API + Node42 AS4 + PostgreSQL + React frontend</li>
+  <li>The project directory structure and purpose of each folder</li>
+  <li>The PostgreSQL schema: companies, users, documents, lines, transactions, api_keys, audit_log</li>
+  <li>The API route design: portal, integration, and admin APIs</li>
+  <li>The outbound flow (draft → validate → discover → send → receipt)</li>
+  <li>The inbound flow (receive → verify → decrypt → route → notify)</li>
+  <li>How Node42 maps to your components and what it handles for you</li>
+  <li>The build order: start with CRUD, add Peppol transport, add integrations last</li>
+</ol>
+
+<h2>📚 What's next?</h2>
+<p>From here, we have two paths:</p>
+<ul>
+  <li><strong>Lesson 5: Hands-on — Scaffolding the project</strong> — we actually create the project, install dependencies, write the first migration and the first Express route together</li>
+  <li><strong>Or</strong> you go build from this blueprint and come back when you hit questions</li>
+</ul>
+<p>Which way do you want to go?</p>
+
+<h2>🤔 Questions?</h2>
+<p>This is the blueprint for everything you'll build. Any feedback on the schema? Routes you think are missing? Something you'd structure differently based on your experience with the stack?</p>
+
+<div class="footer">
+  <p>Lesson 4 of the Peppol Service Provider series. Next: <em>Lesson 5: Hands-on Project Scaffolding</em> (or your choice).</p>
+  <p>See also: <a href="../reference/glossary.html">Glossary</a> | <a href="../reference/ubl-invoice-reference.html">UBL Reference</a></p>
+</div>
+
+</body>
+</html>

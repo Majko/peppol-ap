@@ -1,0 +1,2 @@
+- server bezi na 8080
+- prikazy na star a aj kill mame

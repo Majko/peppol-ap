@@ -1,0 +1,33 @@
+{
+  "name": "peppol-ap",
+  "version": "1.0.0",
+  "description": "Peppol Access Point Core — certified transport layer for Peppol BIS Billing 3.0 invoices",
+  "main": "src/index.js",
+  "directories": {
+    "doc": "doc",
+    "example": "examples",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "node examples/verify-standalone.js",
+    "start": "node src/index.js"
+  },
+  "keywords": ["peppol", "e-invoicing", "access-point", "ubl", "as4", "bis-billing-3.0"],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module",
+  "devDependencies": {
+    "vitest": "^4.1.9"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.9.3",
+    "sax": "^1.6.0",
+    "uuid": "^14.0.1"
+  }
+}

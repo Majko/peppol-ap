@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UBL Invoice Quick Reference</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.5; color: #333; max-width: 900px; margin: 0 auto; padding: 3em 2em; background: #fafaf8; }
+  h1 { font-size: 2em; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.3em; margin-top: 2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.88em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.7em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.7em; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.1em 0.3em; border-radius: 3px; }
+  .card { display: inline-block; font-size: 0.78em; padding: 0.15em 0.5em; border-radius: 3px; font-weight: 600; }
+  .card-M { background: #dbeafe; color: #1e40af; }
+  .card-O { background: #fef3c7; color: #92400e; }
+  .card-1 { background: #d1fae5; color: #065f46; }
+  a { color: #2563eb; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  @media print { body { font-size: 10pt; } }
+</style>
+</head>
+<body>
+
+<h1>📋 UBL Invoice — Quick Reference</h1>
+<p><em>Compressed reference for Peppol BIS Billing 3.0 UBL invoice elements.</em></p>
+
+<p>Cardinality: <span class="card card-1">1..1</span> required · <span class="card card-M">1..n</span> at least one · <span class="card card-O">0..1</span> optional · <span class="card card-O">0..n</span> multiple optional</p>
+
+<h2>Header</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Description</th><th>Value/Example</th></tr>
+  <tr><td><code>cbc:CustomizationID</code></td><td><span class="card card-1">1..1</span></td><td>—</td><td>Identifies the BIS specification</td><td><code>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</code></td></tr>
+  <tr><td><code>cbc:ProfileID</code></td><td><span class="card card-1">1..1</span></td><td>—</td><td>Business process context</td><td><code>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</code></td></tr>
+  <tr><td><code>cbc:ID</code></td><td><span class="card card-1">1..1</span></td><td>BT-1</td><td>Invoice number (unique per seller)</td><td><code>FA-2026-0042</code></td></tr>
+  <tr><td><code>cbc:IssueDate</code></td><td><span class="card card-1">1..1</span></td><td>BT-2</td><td>Date issued (YYYY-MM-DD)</td><td><code>2026-06-15</code></td></tr>
+  <tr><td><code>cbc:DueDate</code></td><td><span class="card card-O">0..1</span></td><td>BT-9</td><td>Payment due date</td><td><code>2026-07-15</code></td></tr>
+  <tr><td><code>cbc:InvoiceTypeCode</code></td><td><span class="card card-1">1..1</span></td><td>BT-3</td><td>380=invoice, 381=credit note, 384=corrected</td><td><code>380</code></td></tr>
+  <tr><td><code>cbc:DocumentCurrencyCode</code></td><td><span class="card card-1">1..1</span></td><td>BT-5</td><td>ISO 4217 currency code</td><td><code>EUR</code></td></tr>
+  <tr><td><code>cbc:BuyerReference</code></td><td><span class="card card-O">0..1</span></td><td>BT-10</td><td>Buyer's internal routing ref</td><td><code>Obj-2026/89</code></td></tr>
+  <tr><td><code>cbc:Note</code></td><td><span class="card card-O">0..1</span></td><td>BT-22</td><td>Free-text note (unstructured)</td><td><code>Ďakujeme za obchod</code></td></tr>
+</table>
+
+<h2>Seller (BG-4)</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Slovak value</th></tr>
+  <tr><td><code>cac:AccountingSupplierParty/cac:Party/cbc:EndpointID</code></td><td><span class="card card-1">1..1</span></td><td>BT-34</td><td><code>SK2023456789</code> (DIČ with SK prefix) @schemeID=<code>9914</code></td></tr>
+  <tr><td><code>cac:PartyName/cbc:Name</code></td><td><span class="card card-1">1..1</span></td><td>BT-35</td><td>Obchodné meno (trading name)</td></tr>
+  <tr><td><code>cac:PostalAddress/cbc:StreetName</code></td><td><span class="card card-O">0..1</span></td><td>BT-35+</td><td><code>Hlavná 15</code></td></tr>
+  <tr><td><code>cac:PostalAddress/cbc:CityName</code></td><td><span class="card card-O">0..1</span></td><td>BT-37</td><td><code>Bratislava</code></td></tr>
+  <tr><td><code>cac:PostalAddress/cbc:PostalZone</code></td><td><span class="card card-O">0..1</span></td><td>BT-38</td><td><code>811 01</code></td></tr>
+  <tr><td><code>cac:PostalAddress/cac:Country/cbc:IdentificationCode</code></td><td><span class="card card-1">1..1</span></td><td>BT-40</td><td><code>SK</code></td></tr>
+  <tr><td><code>cac:PartyTaxScheme/cbc:CompanyID</code></td><td><span class="card card-1">1..1</span></td><td>BT-31</td><td><code>SK2023456789</code> (VAT ID)</td></tr>
+  <tr><td><code>cac:PartyTaxScheme/cac:TaxScheme/cbc:ID</code></td><td><span class="card card-1">1..1</span></td><td>—</td><td><code>VAT</code> (if VAT ID) or other (if tax reg.)</td></tr>
+  <tr><td><code>cac:PartyLegalEntity/cbc:RegistrationName</code></td><td><span class="card card-1">1..1</span></td><td>BT-27</td><td>Full official name: <code>Pekáreň Pod Hradom s.r.o.</code></td></tr>
+  <tr><td><code>cac:PartyLegalEntity/cbc:CompanyID</code></td><td><span class="card card-O">0..1</span></td><td>BT-30</td><td><code>SK12345678</code> (IČO with SK prefix)</td></tr>
+</table>
+
+<h2>Buyer (BG-7)</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Slovak value</th></tr>
+  <tr><td><code>cbc:EndpointID</code></td><td><span class="card card-1">1..1</span></td><td>BT-46</td><td><code>SK4498765432</code> @schemeID=<code>9914</code></td></tr>
+  <tr><td><code>cbc:RegistrationName</code></td><td><span class="card card-1">1..1</span></td><td>BT-44</td><td><code>Mesto Trnava</code></td></tr>
+  <tr><td><code>cbc:CompanyID</code></td><td><span class="card card-O">0..1</span></td><td>BT-47</td><td><code>00312316</code> (IČO) @schemeID=<code>0130</code></td></tr>
+</table>
+
+<h2>Payment (BG-16, BG-17)</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Notes</th></tr>
+  <tr><td><code>cbc:PaymentMeansCode</code></td><td><span class="card card-1">1..1</span></td><td>BT-81</td><td>30=credit transfer, 58=SEPA credit transfer</td></tr>
+  <tr><td><code>cac:PayeeFinancialAccount/cbc:ID</code></td><td><span class="card card-O">0..1</span></td><td>BT-84</td><td>IBAN (required if PaymentMeansCode ∈ {30,58})</td></tr>
+  <tr><td><code>cac:FinancialInstitutionBranch/cbc:ID</code></td><td><span class="card card-O">0..1</span></td><td>BT-86</td><td>BIC</td></tr>
+</table>
+
+<h2>VAT Breakdown (BG-23) — repeat per VAT rate</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Notes</th></tr>
+  <tr><td><code>cbc:TaxAmount (on TaxTotal)</code></td><td><span class="card card-1">1..1</span></td><td>BT-110</td><td>Sum of all TaxSubtotal/TaxAmount</td></tr>
+  <tr><td><code>cac:TaxSubtotal/cbc:TaxableAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-116</td><td>Sum of amounts for this VAT rate</td></tr>
+  <tr><td><code>cac:TaxSubtotal/cbc:TaxAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-117</td><td>VAT amount for this rate</td></tr>
+  <tr><td><code>cac:TaxSubtotal/cac:TaxCategory/cbc:ID</code></td><td><span class="card card-1">1..1</span></td><td>BT-118</td><td>VAT category: <code>S</code>, <code>AA</code>, <code>E</code>, <code>AE</code>, <code>K</code>, <code>G</code></td></tr>
+  <tr><td><code>cac:TaxSubtotal/cac:TaxCategory/cbc:Percent</code></td><td><span class="card card-O">0..1</span></td><td>BT-119</td><td>Rate percentage (<code>23.0</code> for SK standard)</td></tr>
+</table>
+
+<h2>Monetary Totals (BG-22)</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Formula</th></tr>
+  <tr><td><code>cbc:LineExtensionAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-106</td><td>Σ InvoiceLine/LineExtensionAmount</td></tr>
+  <tr><td><code>cbc:TaxExclusiveAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-109</td><td>BT-106 − allowances + charges (doc level)</td></tr>
+  <tr><td><code>cbc:TaxInclusiveAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-112</td><td>BT-109 + BT-110</td></tr>
+  <tr><td><code>cbc:PayableAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-115</td><td>BT-112 − prepaid + rounding</td></tr>
+  <tr><td><code>cbc:AllowanceTotalAmount</code></td><td><span class="card card-O">0..1</span></td><td>BT-107</td><td>Σ doc-level allowances</td></tr>
+  <tr><td><code>cbc:ChargeTotalAmount</code></td><td><span class="card card-O">0..1</span></td><td>BT-108</td><td>Σ doc-level charges</td></tr>
+</table>
+
+<h2>Invoice Line (BG-25) — repeat per line</h2>
+<table>
+  <tr><th>ULElement</th><th>Card</th><th>BT#</th><th>Notes</th></tr>
+  <tr><td><code>cbc:ID</code></td><td><span class="card card-1">1..1</span></td><td>BT-126</td><td>Line number</td></tr>
+  <tr><td><code>cbc:InvoicedQuantity</code></td><td><span class="card card-1">1..1</span></td><td>BT-129</td><td>Quantity with @unitCode (KGM, DAY, HUR, C62…)</td></tr>
+  <tr><td><code>cbc:LineExtensionAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-131</td><td>Line net total = qty × unit price − line allowances + line charges</td></tr>
+  <tr><td><code>cac:Item/cbc:Name</code></td><td><span class="card card-1">1..1</span></td><td>BT-153</td><td>Item name / description</td></tr>
+  <tr><td><code>cac:Item/cac:ClassifiedTaxCategory/cbc:ID</code></td><td><span class="card card-1">1..1</span></td><td>BT-151</td><td>VAT category for this line</td></tr>
+  <tr><td><code>cac:Item/cac:ClassifiedTaxCategory/cbc:Percent</code></td><td><span class="card card-O">0..1</span></td><td>BT-152</td><td>VAT rate for this line</td></tr>
+  <tr><td><code>cac:Price/cbc:PriceAmount</code></td><td><span class="card card-1">1..1</span></td><td>BT-146</td><td>Unit price excl. VAT</td></tr>
+</table>
+
+<h2>Common Code Lists</h2>
+<table>
+  <tr><th>Field</th><th>Code list</th><th>Source</th></tr>
+  <tr><td>InvoiceTypeCode</td><td>380=invoice, 381=credit note, 383=corrected, 384=self-billed</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL1001-inv/">UNCL1001 subset</a></td></tr>
+  <tr><td>Country code</td><td>SK, CZ, DE, AT, HU, PL, etc.</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/ISO3166/">ISO 3166-1 alpha-2</a></td></tr>
+  <tr><td>Currency code</td><td>EUR, CZK, USD, HUF, PLN, etc.</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/ISO4217/">ISO 4217</a></td></tr>
+  <tr><td>VAT category</td><td>S (standard), AA (reduced), E (exempt), AE (reverse charge), K (IC supply), G (free export), O (outside scope)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL5305/">UNCL5305 subset</a></td></tr>
+  <tr><td>Unit codes</td><td>KGM (kg), DAY (day), HUR (hour), C62 (piece), MTR (metre), LTR (litre)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNECERec20/">UNECE Rec20</a></td></tr>
+  <tr><td>Payment means</td><td>30=credit transfer, 42=payment to bank account, 58=SEPA credit transfer</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL4461/">UNCL4461 subset</a></td></tr>
+  <tr><td>EAS / schemeID</td><td>0088=GS1 GLN, 9914=VAT ID, 0192=BIC, 0130=company registry</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/eas/">EAS list</a></td></tr>
+</table>
+
+<hr>
+
+<p><em>Quick reference for Peppol BIS Billing 3.0 (November 2025 release). Last updated: July 2026.</em></p>
+<p><a href="../lessons/0002-anatomy-of-a-peppol-invoice.html">← Back to Lesson 2</a></p>
+
+</body>
+</html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 1: The Peppol Ecosystem — A High-Level Map</title>
+<style>
+  /* Tufte-inspired */
+  body {
+    font-family: Georgia, "Times New Roman", Times, serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 4em 2em;
+    font-size: 16px;
+    background: #fafaf8;
+  }
+  h1, h2, h3 {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #111;
+  }
+  h1 { font-size: 2.2em; margin-top: 0; border-bottom: 2px solid #ddd; padding-bottom: 0.3em; }
+  h2 { font-size: 1.5em; margin-top: 2em; }
+  h3 { font-size: 1.15em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  blockquote {
+    border-left: 3px solid #2563eb;
+    margin: 1.2em 0;
+    padding: 0.6em 1em;
+    background: #f0f4ff;
+    font-style: italic;
+    color: #2c3e50;
+  }
+  code {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: #eee;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+  }
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1em;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    line-height: 1.5;
+  }
+  .diagram {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1.5em;
+    margin: 1.5em 0;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    line-height: 1.6;
+    white-space: pre;
+    overflow-x: auto;
+    color: #333;
+  }
+  .callout {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    padding: 0.8em 1em;
+    margin: 1.2em 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout strong { color: #b45309; }
+  .term { font-weight: 600; color: #1e40af; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .radio-label { display: inline-block; background: #2563eb10; border: 1px solid #2563eb30; border-radius: 4px; padding: 0.1em 0.6em; font-size: 0.85em; font-weight: 600; color: #2563eb; }
+</style>
+</head>
+<body>
+
+<h1>📡 Lesson 1: The Peppol Ecosystem</h1>
+<p><em>What Peppol is, how the 4-corner model works, and what you need to become a service provider.</em></p>
+
+<hr>
+
+<h2>What is Peppol?</h2>
+
+<p><strong>Peppol</strong> stands for <span class="term">Pan-European Public Procurement OnLine</span>. It is both:</p>
+
+<ol>
+  <li><strong>An organisation</strong> (OpenPeppol AISBL) — a Brussels-based international association that manages the standards and governance.</li>
+  <li><strong>A network</strong> — a set of technical specifications, legal agreements, and certified service providers that enable businesses across Europe (and beyond) to exchange electronic business documents securely and interoperably.</li>
+</ol>
+
+<p>Think of Peppol as the "email for business documents" — a standardised postal service where anyone on the network can send invoices, credit notes, purchase orders, and more to anyone else, regardless of what software they use.</p>
+
+<div class="callout">
+  <strong>🇸🇰 Why this matters for Slovakia:</strong> From <strong>1 January 2027</strong>, all VAT-registered businesses in Slovakia must issue e-invoices for domestic B2B transactions — and they must use Peppol-based infrastructure. The government is replacing the current IS EFA system with a new Peppol-native solution. This creates a massive, time-limited market opportunity.
+</div>
+
+<h2>The 4-Corner Model</h2>
+
+<p>Peppol uses a <span class="term">4-corner model</span>. Instead of every company connecting directly to every other company (N² connections), they each connect to a <strong>certified Access Point</strong>:</p>
+
+<div class="diagram">
+  Document flow direction:  Sender ────→ Receiver
+
+  ┌────────────┐        ┌────────────┐        ┌────────────┐        ┌────────────┐
+  │  End User  │        │  Sending   │        │  Receiving │        │  End User  │
+  │  (C1)      │ ────→  │  AP (C2)   │ ────→  │  AP (C3)   │ ────→  │  (C4)      │
+  │  Document  │        │  Your      │        │  Their     │        │  Document  │
+  │  Sender    │        │  Server    │        │  Server    │        │  Receiver  │
+  └────────────┘        └────────────┘        └────────────┘        └────────────┘
+</div>
+
+<p>The corners are <strong>role-agnostic</strong> — they only describe the direction of the document flow. Depending on the scenario:</p>
+
+<table style="width:100%; border-collapse: collapse; margin: 1em 0;">
+  <tr style="background: #1e1e2e; color: #cdd6f4;">
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">Scenario</th>
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">C1 Sender</th>
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">C4 Receiver</th>
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">Document</th>
+  </tr>
+  <tr style="background: #f8f9fa;">
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>B2G invoicing</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Supplier (your SME customer)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>🏛 Government agency</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Invoice</td>
+  </tr>
+  <tr>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>B2B invoicing</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Supplier (your SME customer)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Buyer (another business)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Invoice</td>
+  </tr>
+  <tr style="background: #f8f9fa;">
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Receiving invoices</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Supplier (your SME customer's vendor)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Your SME customer</strong> (as buyer)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Invoice</td>
+  </tr>
+  <tr>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Government sending</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>🏛 Government agency</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Supplier (your SME customer)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Order / Contract</td>
+  </tr>
+</table>
+
+<p class="callout"><strong>🇸🇰 So where is the government?</strong> In the most common case — an SME sending an invoice to the state — your customer is <strong>C1</strong> and the government is <strong>C4</strong>. But your Access Point handles <strong>both directions</strong>: it sends documents from your customers (C1→C2) and receives documents addressed to them (C3→C4 via other APs).</p>
+
+<p>The magic: <strong>you only need to integrate with one Access Point</strong> (Corner 2 or 3), and you can reach anyone else on the network — including every government agency that's connected via their AP. The Access Points handle the translation, validation, and secure delivery.</p>
+
+<h3>Your role as a Service Provider</h3>
+
+<p>You will operate as <strong>Corner 2 and/or Corner 3</strong> — an Access Point that:</p>
+
+<ul>
+  <li><strong>Sends</strong> documents from your customers (SMEs) to other Access Points on the network</li>
+  <li><strong>Receives</strong> documents from other Access Points and delivers them to your customers</li>
+  <li><strong>Validates</strong> documents against Peppol BIS rules before accepting them</li>
+  <li><strong>Manages certificates</strong> (Peppol PKI) to prove you are a trusted participant</li>
+</ul>
+
+<h2>Key Components of the Peppol Network</h2>
+
+<h3>1. Access Point (AP)</h3>
+<p>The core server software that sends and receives AS4 messages. This is what you will build. It handles:</p>
+<ul>
+  <li>AS4 messaging (secure document transport over HTTPS)</li>
+  <li>SBDH (Standard Business Document Header) — the envelope around every document</li>
+  <li>Digital signatures and message-level encryption using Peppol PKI certificates</li>
+  <li>Message receipt acknowledgements (receiving AP must confirm delivery)</li>
+</ul>
+
+<h3>2. Service Metadata Publisher (SMP)</h3>
+<p>A directory that publishes <strong>what documents each participant can receive</strong> and <strong>which AP to send them to</strong>. Think of it as DNS for business documents.</p>
+<ul>
+  <li>When AP-A wants to send an invoice to Participant-B, it first queries the SMP to find: "Which AP does Participant-B use? What document types do they accept? What are the routing rules?"</li>
+  <li>You may also operate an SMP for your customers (Slovak PASR may require this).</li>
+</ul>
+
+<h3>3. Service Metadata Locator (SML)</h3>
+<p>A DNS-based root directory that tells APs <strong>which SMP</strong> to query for a given participant. This is operated centrally by OpenPeppol — you don't build this.</p>
+
+<h3>The flow at a glance</h3>
+<div class="diagram">
+  Sending AP                    SML                     SMP                  Receiving AP
+     │                           │                       │                       │
+     │  1. Where is             │                       │                       │
+     │  Participant-B?          │                       │                       │
+     │─────────────────────────→│                       │                       │
+     │                           │  2. Their SMP is at  │                       │
+     │                           │  smp-provider-b.com  │                       │
+     │←─────────────────────────│                       │                       │
+     │                           │                       │                       │
+     │  3. Query: what can      │                       │                       │
+     │  Participant-B receive?  │                       │                       │
+     │─────────────────────────────────────────────────→│                       │
+     │                           │                       │  4. They accept       │
+     │                           │                       │  invoices at AP-B    │
+     │←─────────────────────────────────────────────────│                       │
+     │                           │                       │                       │
+     │  5. Send invoice via AS4 │                       │                       │
+     │─────────────────────────────────────────────────────────────────────────→│
+</div>
+
+<h2>The Standards Stack</h2>
+
+<p>Peppol invoices go through several layers. From bottom to top:</p>
+
+<table style="width:100%; border-collapse: collapse; margin: 1em 0;">
+  <tr style="background: #1e1e2e; color: #cdd6f4;">
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">Layer</th>
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">Standard</th>
+    <th style="padding: 0.5em 1em; text-align: left; border-bottom: 2px solid #333;">What it does</th>
+  </tr>
+  <tr style="background: #f8f9fa;">
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Document</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Peppol BIS Billing 3.0 (EN 16931)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Defines the business data: invoice fields, VAT codes, party info. Uses UBL 2.1 XML or CII syntax.</td>
+  </tr>
+  <tr>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Envelope</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">SBDH (Standard Business Document Header)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Wraps the business document with routing metadata: sender ID, receiver ID, document type, instance identifier.</td>
+  </tr>
+  <tr style="background: #f8f9fa;">
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Security</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Peppol PKI + AS4 security</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">Digital signatures, encryption, non-repudiation. X.509 certificates issued by an approved Certificate Authority.</td>
+  </tr>
+  <tr>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;"><strong>Transport</strong></td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">AS4 (profile of ebMS 3.0)</td>
+    <td style="padding: 0.5em 1em; border-bottom: 1px solid #ddd;">The actual protocol for sending/receiving messages. Uses SOAP with WSS over HTTPS. Reliable messaging with receipts.</td>
+  </tr>
+</table>
+
+<h2>What documents flow through Peppol?</h2>
+
+<p>Peppol covers a full procurement cycle, but for your MVP you only need the <strong>Post-Award</strong> documents (the invoicing phase):</p>
+
+<ul>
+  <li><strong>Invoice</strong> (UBL <code>Invoice</code>) — the main event</li>
+  <li><strong>Credit Note</strong> (UBL <code>CreditNote</code>) — correcting a previous invoice</li>
+  <li><strong>Status Response</strong> — message-level receipts and business-level status (e.g., "invoice rejected")</li>
+</ul>
+
+<p class="callout"><strong>⚠ Focus:</strong> Start with just Invoice and Credit Note. The Peppol BIS Billing 3.0 spec defines the exact XML structure. You'll validate against Schematron rules and the UBL XML Schema.</p>
+
+<h2>What does it mean to be a Peppol Service Provider?</h2>
+
+<p>Legally, you must:</p>
+<ol>
+  <li><strong>Become an OpenPeppol member</strong> — pay annual fees based on company revenue tier.</li>
+  <li><strong>Sign the Peppol Service Provider Agreement</strong> with the Slovak Peppol Authority (Financial Directorate of the Slovak Republic — <code>efaktura@financnasprava.sk</code>).</li>
+  <li><strong>Pass interoperability testing</strong> in the OpenPeppol Testbed — they verify your AP correctly sends/receives BIS-compliant documents over AS4.</li>
+  <li><strong>Obtain Peppol PKI certificates</strong> — one for signing messages, one for TLS (the TLS one can be from any trusted CA).</li>
+  <li><strong>Register in the SMP</strong> — so other APs can discover your customers.</li>
+</ol>
+
+<div class="callout">
+  <strong>🛠 Technically,</strong> you can build and test your AP before doing any of this (using self-signed certs and the Peppol test environment). The legal process runs in parallel. The 4-week prototype timeline focuses on the technical implementation first.
+</div>
+
+<h2>What you'll build (high-level architecture)</h2>
+
+<div class="diagram">
+  ┌──────────────┐     ┌─────────────────────────────────────┐
+  │              │     │         Your Platform                │
+  │   SME        │     │                                     │
+  │   (React     │ ←─→ │  React Portal   ←→  Express API    │
+  │    client)   │     │  (Vite)              (Node.js)      │
+  │              │     │       │                  │          │
+  └──────────────┘     │       │                  │          │
+                       │  ┌────┴──────────────────┘────┐     │
+  ┌──────────────┐     │  │      Core Engine           │     │
+  │              │     │  │                           │     │
+  │  Accounting  │ ←─→ │  │  - AS4 Client/Server      │     │
+  │  Software    │     │  │  - UBL XML Generator/Parser│     │
+  │  (via API)   │     │  │  - BIS Validator           │     │
+  │              │     │  │  - Certificate Manager     │     │
+  └──────────────┘     │  │  - SMP Lookup              │     │
+                       │  └───────────┬───────────────┘     │
+                       │              │                     │
+                       │              ▼                     │
+                       │  ┌──────────────────────┐         │
+                       │  │   PostgreSQL         │         │
+                       │  │   - Companies        │         │
+                       │  │   - Documents         │         │
+                       │  │   - Transactions     │         │
+                       │  │   - Certificates     │         │
+                       │  └──────────────────────┘         │
+                       └─────────────────────────────────────┘
+</div>
+
+<h3>The pieces:</h3>
+<ul>
+  <li><strong>React Portal (Vite):</strong> SME onboarding, manual invoice entry, dashboard, document viewer</li>
+  <li><strong>Express API:</strong> REST endpoints for portal + integration API for accounting software</li>
+  <li><strong>AS4 Engine:</strong> The Peppol transport layer — send/receive AS4 messages, manage SBDH envelopes</li>
+  <li><strong>PostgreSQL:</strong> All persistent state — users, companies, invoices, message tracking, audit log</li>
+  <li><strong>Integration API:</strong> REST endpoints for SMEs' accounting software to push/pull invoices</li>
+</ul>
+
+<hr>
+
+<h2>✅ What you can now explain</h2>
+<ol>
+  <li>What Peppol is (organisation + network)</li>
+  <li>The 4-corner model and where your AP fits (Corner 2/3)</li>
+  <li>The three components: AP, SMP, SML — and which you build</li>
+  <li>The standards stack: BIS → SBDH → PKI → AS4</li>
+  <li>Why Slovakia from 1 Jan 2027 creates a business opportunity</li>
+  <li>The legal steps to become a certified provider</li>
+  <li>The high-level architecture of what you'll build</li>
+</ol>
+
+<h2>📚 Recommended reading</h2>
+<ul>
+  <li><a href="https://peppol.org/learn-more/peppol-interoperability-framework/">OpenPeppol — Interoperability Framework</a> (read this page fully)</li>
+  <li><a href="https://openpeppol.atlassian.net/wiki/spaces/PKB/pages/4717805586/Peppol+eDelivery+Network+Conceptual+Architecture">Peppol eDelivery Network Conceptual Architecture</a> (the 4-corner model deep-dive)</li>
+  <li><a href="https://peppol.org/wp-content/uploads/2024/04/how_to_set-up_a__post-award__peppol_access_point_v2.1.pdf">How to set up a Post-Award Peppol Access Point</a> (OpenPeppol's step-by-step PDF)</li>
+  <li><a href="https://www.financnasprava.sk/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.04.17_detailed_step_by_step.pdf">Slovak Peppol Authority — Accreditation Instructions</a></li>
+</ul>
+
+<h2>🤔 Questions?</h2>
+<p>This is the big picture. Before we move to Lesson 2 (where we dive into the AS4 protocol and start looking at actual code), <strong>ask any follow-up questions</strong> you have. What's unclear? What do you want me to zoom in on? What surprised you?</p>
+
+<p>The agent (me) is your teacher — I can explain anything further, adjust the pace, or jump into whatever angle interests you most.</p>
+
+<div class="footer">
+  <p>Lesson 1 of the Peppol Service Provider series. Next: <em>Lesson 2: AS4 Messaging Deep Dive &amp; First Node.js Prototype</em>.</p>
+  <p>See also: <a href="../reference/glossary.html">Glossary of Peppol Terms</a></p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AP Core Interface — API Reference</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.5; color: #333; max-width: 860px; margin: 0 auto; padding: 3em 2em; background: #fafaf8; }
+  h1 { font-size: 2em; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.35em; margin-top: 2.5em; color: #1e40af; border-bottom: 1px solid #ddd; padding-bottom: 0.2em; }
+  h3 { font-size: 1.1em; margin-top: 1.8em; color: #444; }
+  p { margin: 0.7em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.8em; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .badge { display: inline-block; font-size: 0.75em; padding: 0.15em 0.5em; border-radius: 3px; font-weight: 600; }
+  .badge-req { background: #dbeafe; color: #1e40af; }
+  .badge-opt { background: #fef3c7; color: #92400e; }
+  .badge-post { background: #10b981; color: #fff; }
+  .badge-get { background: #3b82f6; color: #fff; }
+  .hr { border: none; border-top: 1px dashed #ccc; margin: 0.5em 0; }
+</style>
+</head>
+<body>
+
+<h1>🔌 AP Core Interface Specification</h1>
+<p><em>The contract between the Peppol AP Core and any Service Platform.</em></p>
+
+<div class="info">
+  <strong>💡 This is the interface boundary.</strong> Everything on this page belongs to the AP Core side. The Service Platform (your React portal + Express + PostgreSQL) calls these operations. An accounting software vendor could also call them directly via the REST API. The AP Core never touches user management, databases, or business logic.
+</div>
+
+<hr>
+
+<h2>Operation 1: Send Invoice</h2>
+<p><span class="badge badge-post">POST</span> <code>/api/send</code></p>
+<p>Push a UBL invoice to a receiver on the Peppol network. The AP Core handles the entire AS4 pipeline: SML/SMP discovery → build SBDH → construct AS4 SOAP → sign → encrypt → send → verify receipt.</p>
+
+<h3>Request</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Card</th><th>Description</th></tr>
+  <tr><td><code>sender_id</code></td><td>string</td><td><span class="badge badge-req">REQ</span></td><td>Your customer's Peppol participant ID, e.g. <code>9914:SK2023456789</code></td></tr>
+  <tr><td><code>receiver_id</code></td><td>string</td><td><span class="badge badge-req">REQ</span></td><td>The receiver's Peppol participant ID, e.g. <code>0088:SK4498765432</code></td></tr>
+  <tr><td><code>ubl_xml</code></td><td>string</td><td><span class="badge badge-req">REQ</span></td><td>The full UBL Invoice or CreditNote XML (Peppol BIS Billing 3.0)</td></tr>
+  <tr><td><code>document_type</code></td><td>string</td><td><span class="badge badge-opt">OPT</span></td><td>If omitted, derived from the UBL document. Explicit: <code>invoice</code> or <code>credit_note</code></td></tr>
+  <tr><td><code>process_id</code></td><td>string</td><td><span class="badge badge-opt">OPT</span></td><td>If omitted, uses default billing process. Explicit: <code>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</code></td></tr>
+</table>
+
+<h3>Response (success)</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>message_id</code></td><td>string</td><td>Peppol message ID (<code>uuid:...@ap.mojafaktura.sk</code>). Used for tracking and receipts.</td></tr>
+  <tr><td><code>status</code></td><td>string</td><td>One of: <code>sent</code> (AP accepted), <code>delivered</code> (receipt received from remote AP)</td></tr>
+  <tr><td><code>receipt</code></td><td>string | null</td><td>The signed MDN receipt XML, if the remote AP acknowledged</td></tr>
+  <tr><td><code>timestamp</code></td><td>string</td><td>ISO 8601 timestamp of completion</td></tr>
+</table>
+
+<h3>Response (error)</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>error</code></td><td>string</td><td>Error code: <code>validation_failed</code>, <code>lookup_failed</code>, <code>send_failed</code>, <code>receipt_timeout</code></td></tr>
+  <tr><td><code>details</code></td><td>array</td><td>List of error details. For validation errors: Schematron violation messages.</td></tr>
+</table>
+
+<h3>Example</h3>
+<pre>POST /api/send
+Content-Type: application/json
+
+{
+  "sender_id": "9914:SK2023456789",
+  "receiver_id": "0088:SK4498765432",
+  "ubl_xml": "&lt;?xml version=\"1.0\"...&gt;&lt;Invoice xmlns=...&gt;..."
+}
+
+→ 200 OK
+
+{
+  "message_id": "uuid:a1b2c3d4-...@ap.mojafaktura.sk",
+  "status": "delivered",
+  "receipt": "&lt;?...&gt;&lt;SignalMessage&gt;...&lt;/SignalMessage&gt;",
+  "timestamp": "2026-07-03T14:30:00Z"
+}</pre>
+
+<div class="callout">
+  <strong>⚙ What happens inside the AP Core during send:</strong>
+  <ol>
+    <li>Validate the UBL XML against Schematron rules → reject with <code>validation_failed</code> if invalid</li>
+    <li>Resolve <code>receiver_id</code> via SML (DNS) → find their SMP → get endpoint URL + encryption certificate</li>
+    <li>Wrap UBL in SBDH envelope (sender = <code>sender_id</code>, receiver = <code>receiver_id</code>)</li>
+    <li>Build AS4 SOAP header (eb:Messaging with AgreementRef, Service, Action, PartyInfo)</li>
+    <li>Sign the SOAP envelope with your AP's Peppol PKI signing certificate</li>
+    <li>Encrypt the SBDH+UBL payload with the receiver's encryption certificate</li>
+    <li>Assemble MIME multipart/related message</li>
+    <li>POST to the receiver's endpoint over HTTPS (port 443)</li>
+    <li>Wait for receipt (MDN) from the receiver — verify their signature</li>
+    <li>Return result to the platform</li>
+  </ol>
+</div>
+
+<hr>
+
+<h2>Operation 2: Receive Invoice (Webhook)</h2>
+<p><span class="badge badge-post">POST</span> <code>→ [your registered callback URL]</code></p>
+<p>When the AP Core receives an AS4 message from another AP on port 443, it calls your registered webhook with the extracted document. The AP Core automatically generates and sends the signed MDN receipt back to the sending AP.</p>
+
+<h3>Webhook registration</h3>
+<p>Tell the AP Core where to deliver received documents:</p>
+<table>
+  <tr><th>Endpoint</th><th>Method</th><th>Body</th></tr>
+  <tr><td><code>POST /api/webhook/register</code></td>
+      <td><span class="badge badge-post">POST</span></td>
+      <td><code>{ "url": "https://app.mojafaktura.sk/api/webhook/invoice-received", "secret": "whsec_..." }</td></tr>
+</table>
+
+<h3>Webhook payload (AP Core → Platform)</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>event</code></td><td>string</td><td><code>invoice.received</code></td></tr>
+  <tr><td><code>message_id</code></td><td>string</td><td>Peppol message ID from the sending AP</td></tr>
+  <tr><td><code>sender_id</code></td><td>string</td><td>The C1 sender's Peppol participant ID (from SBDH)</td></tr>
+  <tr><td><code>receiver_id</code></td><td>string</td><td>The C4 receiver's Peppol participant ID (your customer)</td></tr>
+  <tr><td><code>ubl_xml</code></td><td>string</td><td>The extracted UBL XML document</td></tr>
+  <tr><td><code>document_type</code></td><td>string</td><td><code>invoice</code> or <code>credit_note</code></td></tr>
+  <tr><td><code>received_at</code></td><td>string</td><td>ISO 8601 timestamp</td></tr>
+</table>
+
+<h3>Webhook signature</h3>
+<p>Each webhook call includes a <code>X-Signature-256</code> header: HMAC-SHA256 of the JSON body, keyed with the shared secret. The platform verifies this to confirm the webhook came from the AP Core.</p>
+
+<h3>Example</h3>
+<pre>POST https://app.mojafaktura.sk/api/webhook/invoice-received
+Content-Type: application/json
+X-Signature-256: a1b2c3d4e5f6...
+
+{
+  "event": "invoice.received",
+  "message_id": "uuid:x9y8z7w6-...@ap.druhafirma.sk",
+  "sender_id": "9914:SK5599887766",
+  "receiver_id": "9914:SK2023456789",
+  "ubl_xml": "&lt;?xml...&gt;&lt;Invoice xmlns=...&gt;...",
+  "document_type": "invoice",
+  "received_at": "2026-07-03T15:00:00Z"
+}</pre>
+
+<div class="callout">
+  <strong>⚙ What happens inside the AP Core on receive:</strong>
+  <ol>
+    <li>Listen on port 443 for incoming POST with Content-Type <code>multipart/related</code></li>
+    <li>Parse the SOAP envelope → extract eb:Messaging header</li>
+    <li>Verify the sender's digital signature against their Peppol certificate (fetched from SMP)</li>
+    <li>Decrypt the payload using your AP's private key</li>
+    <li>Parse SBDH → extract sender (C1), receiver (C4), document type</li>
+    <li>Validate UBL with Schematron</li>
+    <li>Generate and sign MDN receipt → send back to the sending AP</li>
+    <li>Call your registered webhook with the extracted data</li>
+    <li>If webhook fails, retry 3 times with backoff, then store for manual replay</li>
+  </ol>
+</div>
+
+<hr>
+
+<h2>Operation 3: Get Status</h2>
+<p><span class="badge badge-get">GET</span> <code>/api/status/{message_id}</code></p>
+<p>Check the delivery status of a previously sent message.</p>
+
+<h3>Response</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>message_id</code></td><td>string</td><td>The message ID from the send response</td></tr>
+  <tr><td><code>status</code></td><td>string</td><td><code>pending</code> | <code>sent</code> | <code>delivered</code> | <code>failed</code></td></tr>
+  <tr><td><code>receipt</code></td><td>string | null</td><td>The MDN receipt XML if delivered</td></tr>
+  <tr><td><code>error</code></td><td>string | null</td><td>Error detail if failed</td></tr>
+  <tr><td><code>retries</code></td><td>number</td><td>Number of send attempts</td></tr>
+  <tr><td><code>updated_at</code></td><td>string</td><td>ISO 8601 of last status change</td></tr>
+</table>
+
+<hr>
+
+<h2>Operation 4: Lookup Participant</h2>
+<p><span class="badge badge-get">GET</span> <code>/api/lookup/{participant_id}</code></p>
+<p>Resolve a Peppol participant ID to its SMP metadata — useful for checking if a participant exists before sending, or viewing their capabilities.</p>
+
+<h3>Response</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>participant_id</code></td><td>string</td><td>The queried participant ID</td></tr>
+  <tr><td><code>smp_url</code></td><td>string</td><td>The SMP endpoint for this participant</td></tr>
+  <tr><td><code>services</code></td><td>array</td><td>List of supported document types and their endpoints</td></tr>
+  <tr><td><code>services[].document_type</code></td><td>string</td><td>e.g. <code>urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##...</code></td></tr>
+  <tr><td><code>services[].process_id</code></td><td>string</td><td>e.g. <code>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</code></td></tr>
+  <tr><td><code>services[].endpoint</code></td><td>string</td><td>The AP endpoint URL, e.g. <code>https://ap.gov.sk/as4</code></td></tr>
+  <tr><td><code>services[].certificate</code></td><td>string</td><td>The receiving AP's encryption certificate (PEM)</td></tr>
+  <tr><td><code>resolved_at</code></td><td>string</td><td>ISO 8601 timestamp</td></tr>
+</table>
+
+<div class="info">
+  <strong>💡 SMP response caching.</strong> SMP metadata changes infrequently. The AP Core caches results for 1 hour to avoid redundant DNS lookups. Forced refresh with <code>?refresh=true</code>.
+</div>
+
+<hr>
+
+<h2>Operation 5: Validate Document</h2>
+<p><span class="badge badge-post">POST</span> <code>/api/validate</code></p>
+<p>Validate a UBL document against Peppol Schematron rules before sending. The platform can call this to catch errors before the SME clicks "Send."</p>
+<p>→ See <a href="ap-core-validation-rules.html">AP Core Validation Rules</a> for the complete list of what is checked.</p>
+
+<h3>Request</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Card</th><th>Description</th></tr>
+  <tr><td><code>ubl_xml</code></td><td>string</td><td><span class="badge badge-req">REQ</span></td><td>The UBL XML to validate</td></tr>
+  <tr><td><code>schema</code></td><td>string</td><td><span class="badge badge-opt">OPT</span></td><td>Which ruleset: <code>peppol</code> (default), <code>cen</code> (EN 16931 only), <code>both</code></td></tr>
+</table>
+
+<h3>Response</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+  <tr><td><code>valid</code></td><td>boolean</td><td><code>true</code> if all rules pass</td></tr>
+  <tr><td><code>errors</code></td><td>array</td><td>List of violations (empty if valid)</td></tr>
+  <tr><td><code>errors[].rule</code></td><td>string</td><td>Schematron rule ID, e.g. <code>PEPPOL-EN16931-R001</code></td></tr>
+  <tr><td><code>errors[].message</code></td><td>string</td><td>Human-readable description</td></tr>
+  <tr><td><code>errors[].location</code></td><td>string</td><td>XPath to the offending element</td></tr>
+  <tr><td><code>errors[].severity</code></td><td>string</td><td><code>fatal</code> | <code>warning</code></td></tr>
+  <tr><td><code>warnings</code></td><td>array</td><td>Non-blocking recommendations</td></tr>
+</table>
+
+<hr>
+
+<h2>Optional: Certificate Management</h2>
+<p>For admin use — managing the AP Core's Peppol PKI certificates.</p>
+
+<table>
+  <tr><th>Endpoint</th><th>Method</th><th>Description</th></tr>
+  <tr><td><code>/api/admin/certificate</code></td><td><span class="badge badge-get">GET</span></td><td>Show current certificate info (subject, issuer, expiry, fingerprint)</td></tr>
+  <tr><td><code>/api/admin/certificate</code></td><td><span class="badge badge-post">POST</span></td><td>Upload/replace the Peppol PKI certificate + key</td></tr>
+  <tr><td><code>/api/admin/certificate/truststore</code></td><td><span class="badge badge-post">POST</span></td><td>Upload Peppol trust store (root + intermediate CAs)</td></tr>
+  <tr><td><code>/api/admin/tls</code></td><td><span class="badge badge-post">POST</span></td><td>Upload/replace the TLS certificate</td></tr>
+</table>
+
+<hr>
+
+<h2>Operation Summary</h2>
+
+<table>
+  <tr><th>#</th><th>Operation</th><th>Direction</th><th>Required for AP?</th></tr>
+  <tr><td>1</td><td><code>POST /api/send</code></td><td>Platform → AP Core</td><td>✅ Yes — without it, you can't send</td></tr>
+  <tr><td>2</td><td>Webhook: <code>invoice.received</code></td><td>AP Core → Platform</td><td>✅ Yes — without it, you can't receive</td></tr>
+  <tr><td>3</td><td><code>GET /api/status/{id}</code></td><td>Platform → AP Core</td><td>✅ Yes — needed for delivery confirmation</td></tr>
+  <tr><td>4</td><td><code>GET /api/lookup/{id}</code></td><td>Platform → AP Core</td><td>🔹 Optional — useful for pre-flight checks</td></tr>
+  <tr><td>5</td><td><code>POST /api/validate</code></td><td>Platform → AP Core</td><td>🔹 Optional — can also run validation in the platform</td></tr>
+  <tr><td>6</td><td><code>POST /api/webhook/register</code></td><td>Platform → AP Core</td><td>✅ Yes — needed to set up inbound delivery</td></tr>
+  <tr><td>7</td><td>Certificate endpoints</td><td>Admin → AP Core</td><td>✅ Yes — manual rotation</td></tr>
+  <tr><td>8</td><td><code>GET /api/health</code></td><td>Monitoring → AP Core</td><td>🔹 Optional — nice for uptime checks</td></tr>
+</table>
+
+<hr>
+
+<h2>What this enables</h2>
+
+<p>With this interface, the Service Platform is completely decoupled from the Peppol transport layer. Several architectural possibilities open up:</p>
+
+<ul>
+  <li><strong>Your React portal</strong> calls <code>/api/send</code> when an SME clicks "Send"</li>
+  <li><strong>An accounting software</strong> calls <code>/api/send</code> directly (via the integration API, which proxies to the AP Core)</li>
+  <li><strong>A different company</strong> could build their own portal on top of your AP Core, paying you for transport only</li>
+  <li><strong>The AP Core</strong> can be replaced with a different AS4 implementation (e.g., Java-based Phase4) without changing the platform code — as long as the interface stays the same</li>
+  <li><strong>Single-server prototype:</strong> the AP Core functions are just in-process calls. <strong>Production:</strong> they become HTTP calls to the separate AP Core server. The interface contract is identical.</li>
+</ul>
+
+<div class="callout">
+  <strong>🎯 Prototyping tip:</strong> Start with the AP Core as in-process JavaScript functions (just import Node42 and call it). The Service Platform calls the same interface. When you split servers in week 4, you wrap the same functions behind Express routes — no logic changes, just adding HTTP.
+</div>
+
+<hr>
+
+<p><a href="../lessons/0004-architecture-and-project-setup.html">← Back to Lesson 4</a> | <a href="../reference/glossary.html">Glossary</a></p>
+
+</body>
+</html>

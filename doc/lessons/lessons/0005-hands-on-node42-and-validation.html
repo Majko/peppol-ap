@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 5: Hands-on — Installing Node42, Validating, and Probing the Network</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.82em; line-height: 1.45; }
+  pre .tag { color: #89b4fa; }
+  pre .attr { color: #a6e3a1; }
+  pre .val { color: #f9e2af; }
+  pre .cm { color: #6c7086; font-style: italic; }
+  pre .k { color: #cba6f7; }
+  pre .err { color: #f38ba8; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .cmd { font-family: "SF Mono", "Fira Code", monospace; background: #1e1e2e; color: #a6e3a1; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.88em; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+</style>
+</head>
+<body>
+
+<h1>🛠️ Lesson 5: Hands-on — Node42, Validation &amp; Network Probing</h1>
+<p><em>Installing the tools, validating real invoices, and talking to the live Peppol network — all without accreditation.</em></p>
+
+<hr>
+
+<h2>What you'll accomplish</h2>
+
+<p>By the end of this session, you will have:</p>
+<ol>
+  <li>Node42 installed and configured on this server</li>
+  <li>A sample Peppol invoice validated against real Schematron rules</li>
+  <li>Probed the live Peppol network to resolve real participants</li>
+  <li>The AP Core project skeleton created</li>
+  <li>A clear picture of what's needed for the first actual AS4 send</li>
+</ol>
+
+<div class="info">
+  <strong>💡 No accreditation needed.</strong> Everything below works with public information and local tools. The only thing you can't do yet is <em>send</em> an AS4 message — that requires test PKI certificates from OpenPeppol (which comes after membership). But you can prepare every other layer.
+</div>
+
+<h2>Step 1: Install Node42</h2>
+
+<p>Node42 is a pure Node.js toolkit — no Java, no native dependencies. Install it globally:</p>
+
+<pre><span class="k">npm install -g @n42/edelivery</span></pre>
+
+<p>Verify it works:</p>
+
+<pre><span class="k">n42-edelivery --version</span>
+<span class="cm">→ 0.2.85</span>
+
+<span class="k">n42-edelivery --help</span>
+<span class="cm">→ Shows commands: init, pki, send, validate, report</span></pre>
+
+<div class="callout">
+  <strong>⚠ Run this on this server now.</strong> The peppoll-access directory is your working space. You can install Node42 globally and use it from anywhere.
+</div>
+
+<h2>Step 2: Initialize your workspace</h2>
+
+<p>Node42 needs a workspace with certificates, Schematron rules, and a document template. Let's create one:</p>
+
+<pre><span class="k">cd ~/projects-dir/ideas/pepoll-access</span>
+<span class="k">n42-edelivery init</span></pre>
+
+<p>This creates <code>.node42/</code> in your working directory with:</p>
+
+<pre>.node42/
+├── certs/
+│   ├── cert.pem          <span class="cm">← your AP certificate (placeholder)</span>
+│   ├── key.pem           <span class="cm">← your private key (placeholder)</span>
+│   └── truststore.pem    <span class="cm">← Peppol root CA certificates</span>
+└── templates/
+    └── ubl.json          <span class="cm">← UBL document descriptor</span></pre>
+
+<p>The <code>init</code> command creates placeholder certificates and fetches the latest Peppol truststore and Schematron rules. For now, we'll use the test certificates that come with the installation.</p>
+
+<h2>Step 3: Validate a Peppol invoice</h2>
+
+<p>Let's take the Slovak bakery invoice from Lesson 2 and validate it against the real Peppol Schematron rules. First, save the invoice XML to a file:</p>
+
+<pre><span class="k">cat > /tmp/test-invoice.xml &lt;&lt; 'XMLEOF'</span>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+    xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"&gt;
+  &lt;cbc:CustomizationID&gt;urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0&lt;/cbc:CustomizationID&gt;
+  &lt;cbc:ProfileID&gt;urn:fdc:peppol.eu:2017:poacc:billing:01:1.0&lt;/cbc:ProfileID&gt;
+  &lt;cbc:ID&gt;FA-2026-0042&lt;/cbc:ID&gt;
+  &lt;cbc:IssueDate&gt;2026-06-15&lt;/cbc:IssueDate&gt;
+  &lt;cbc:DueDate&gt;2026-07-15&lt;/cbc:DueDate&gt;
+  &lt;cbc:InvoiceTypeCode&gt;380&lt;/cbc:InvoiceTypeCode&gt;
+  &lt;cbc:DocumentCurrencyCode&gt;EUR&lt;/cbc:DocumentCurrencyCode&gt;
+  &lt;cbc:BuyerReference&gt;Objednavka-2026/89&lt;/cbc:BuyerReference&gt;
+  &lt;cac:AccountingSupplierParty&gt;
+    &lt;cac:Party&gt;
+      &lt;cbc:EndpointID schemeID="9914"&gt;SK2023456789&lt;/cbc:EndpointID&gt;
+      &lt;cac:PartyName&gt;&lt;cbc:Name&gt;Pekáreň Pod Hradom s.r.o.&lt;/cbc:Name&gt;&lt;/cac:PartyName&gt;
+      &lt;cac:PostalAddress&gt;
+        &lt;cbc:StreetName&gt;Hlavná 15&lt;/cbc:StreetName&gt;
+        &lt;cbc:CityName&gt;Bratislava&lt;/cbc:CityName&gt;
+        &lt;cbc:PostalZone&gt;811 01&lt;/cbc:PostalZone&gt;
+        &lt;cac:Country&gt;&lt;cbc:IdentificationCode&gt;SK&lt;/cbc:IdentificationCode&gt;&lt;/cac:Country&gt;
+      &lt;/cac:PostalAddress&gt;
+      &lt;cac:PartyTaxScheme&gt;
+        &lt;cbc:CompanyID&gt;SK2023456789&lt;/cbc:CompanyID&gt;
+        &lt;cac:TaxScheme&gt;&lt;cbc:ID&gt;VAT&lt;/cbc:ID&gt;&lt;/cac:TaxScheme&gt;
+      &lt;/cac:PartyTaxScheme&gt;
+      &lt;cac:PartyLegalEntity&gt;
+        &lt;cbc:RegistrationName&gt;Pekáreň Pod Hradom s.r.o.&lt;/cbc:RegistrationName&gt;
+        &lt;cbc:CompanyID&gt;SK12345678&lt;/cbc:CompanyID&gt;
+      &lt;/cac:PartyLegalEntity&gt;
+    &lt;/cac:Party&gt;
+  &lt;/cac:AccountingSupplierParty&gt;
+  &lt;cac:AccountingCustomerParty&gt;
+    &lt;cac:Party&gt;
+      &lt;cbc:EndpointID schemeID="9914"&gt;SK4498765432&lt;/cbc:EndpointID&gt;
+      &lt;cac:PartyName&gt;&lt;cbc:Name&gt;Mesto Trnava&lt;/cbc:Name&gt;&lt;/cac:PartyName&gt;
+      &lt;cac:PostalAddress&gt;
+        &lt;cbc:StreetName&gt;Trojičné námestie 1&lt;/cbc:StreetName&gt;
+        &lt;cbc:CityName&gt;Trnava&lt;/cbc:CityName&gt;
+        &lt;cbc:PostalZone&gt;917 01&lt;/cbc:PostalZone&gt;
+        &lt;cac:Country&gt;&lt;cbc:IdentificationCode&gt;SK&lt;/cbc:IdentificationCode&gt;&lt;/cac:Country&gt;
+      &lt;/cac:PostalAddress&gt;
+      &lt;cac:PartyTaxScheme&gt;
+        &lt;cbc:CompanyID&gt;SK4498765432&lt;/cbc:CompanyID&gt;
+        &lt;cac:TaxScheme&gt;&lt;cbc:ID&gt;VAT&lt;/cbc:ID&gt;&lt;/cac:TaxScheme&gt;
+      &lt;/cac:PartyTaxScheme&gt;
+      &lt;cac:PartyLegalEntity&gt;
+        &lt;cbc:RegistrationName&gt;Mesto Trnava&lt;/cbc:RegistrationName&gt;
+        &lt;cbc:CompanyID&gt;00312316&lt;/cbc:CompanyID&gt;
+      &lt;/cac:PartyLegalEntity&gt;
+    &lt;/cac:Party&gt;
+  &lt;/cac:AccountingCustomerParty&gt;
+  &lt;cac:TaxTotal&gt;
+    &lt;cbc:TaxAmount currencyID="EUR"&gt;529.00&lt;/cbc:TaxAmount&gt;
+    &lt;cac:TaxSubtotal&gt;
+      &lt;cbc:TaxableAmount currencyID="EUR"&gt;2000.00&lt;/cbc:TaxableAmount&gt;
+      &lt;cbc:TaxAmount currencyID="EUR"&gt;460.00&lt;/cbc:TaxAmount&gt;
+      &lt;cac:TaxCategory&gt;
+        &lt;cbc:ID&gt;S&lt;/cbc:ID&gt;
+        &lt;cbc:Percent&gt;23.0&lt;/cbc:Percent&gt;
+        &lt;cac:TaxScheme&gt;&lt;cbc:ID&gt;VAT&lt;/cbc:ID&gt;&lt;/cac:TaxScheme&gt;
+      &lt;/cac:TaxCategory&gt;
+    &lt;/cac:TaxSubtotal&gt;
+    &lt;cac:TaxSubtotal&gt;
+      &lt;cbc:TaxableAmount currencyID="EUR"&gt;690.00&lt;/cbc:TaxableAmount&gt;
+      &lt;cbc:TaxAmount currencyID="EUR"&gt;69.00&lt;/cbc:TaxAmount&gt;
+      &lt;cac:TaxCategory&gt;
+        &lt;cbc:ID&gt;AA&lt;/cbc:ID&gt;
+        &lt;cbc:Percent&gt;10.0&lt;/cbc:Percent&gt;
+        &lt;cac:TaxScheme&gt;&lt;cbc:ID&gt;VAT&lt;/cbc:ID&gt;&lt;/cac:TaxScheme&gt;
+      &lt;/cac:TaxCategory&gt;
+    &lt;/cac:TaxSubtotal&gt;
+  &lt;/cac:TaxTotal&gt;
+  &lt;cac:LegalMonetaryTotal&gt;
+    &lt;cbc:LineExtensionAmount currencyID="EUR"&gt;2400.00&lt;/cbc:LineExtensionAmount&gt;
+    &lt;cbc:TaxExclusiveAmount currencyID="EUR"&gt;2690.00&lt;/cbc:TaxExclusiveAmount&gt;
+    &lt;cbc:TaxInclusiveAmount currencyID="EUR"&gt;3219.00&lt;/cbc:TaxInclusiveAmount&gt;
+    &lt;cbc:AllowanceTotalAmount currencyID="EUR"&gt;50.00&lt;/cbc:AllowanceTotalAmount&gt;
+    &lt;cbc:ChargeTotalAmount currencyID="EUR"&gt;340.00&lt;/cbc:ChargeTotalAmount&gt;
+    &lt;cbc:PayableAmount currencyID="EUR"&gt;3219.00&lt;/cbc:PayableAmount&gt;
+  &lt;/cac:LegalMonetaryTotal&gt;
+  &lt;cac:InvoiceLine&gt;
+    &lt;cbc:ID&gt;1&lt;/cbc:ID&gt;
+    &lt;cbc:InvoicedQuantity unitCode="KGM"&gt;100&lt;/cbc:InvoicedQuantity&gt;
+    &lt;cbc:LineExtensionAmount currencyID="EUR"&gt;2000.00&lt;/cbc:LineExtensionAmount&gt;
+    &lt;cac:Item&gt;
+      &lt;cbc:Name&gt;Ražný chlieb 1kg&lt;/cbc:Name&gt;
+      &lt;cac:ClassifiedTaxCategory&gt;
+        &lt;cbc:ID&gt;AA&lt;/cbc:ID&gt;
+        &lt;cbc:Percent&gt;10.0&lt;/cbc:Percent&gt;
+        &lt;cac:TaxScheme&gt;&lt;cbc:ID&gt;VAT&lt;/cbc:ID&gt;&lt;/cac:TaxScheme&gt;
+      &lt;/cac:ClassifiedTaxCategory&gt;
+    &lt;/cac:Item&gt;
+    &lt;cac:Price&gt;
+      &lt;cbc:PriceAmount currencyID="EUR"&gt;20.00&lt;/cbc:PriceAmount&gt;
+    &lt;/cac:Price&gt;
+  &lt;/cac:InvoiceLine&gt;
+  &lt;cac:InvoiceLine&gt;
+    &lt;cbc:ID&gt;2&lt;/cbc:ID&gt;
+    &lt;cbc:InvoicedQuantity unitCode="DAY"&gt;5&lt;/cbc:InvoicedQuantity&gt;
+    &lt;cbc:LineExtensionAmount currencyID="EUR"&gt;400.00&lt;/cbc:LineExtensionAmount&gt;
+    &lt;cac:Item&gt;
+      &lt;cbc:Name&gt;Catering - obedové menu&lt;/cbc:Name&gt;
+      &lt;cac:ClassifiedTaxCategory&gt;
+        &lt;cbc:ID&gt;S&lt;/cbc:ID&gt;
+        &lt;cbc:Percent&gt;23.0&lt;/cbc:Percent&gt;
+        &lt;cac:TaxScheme&gt;&lt;cbc:ID&gt;VAT&lt;/cbc:ID&gt;&lt;/cac:TaxScheme&gt;
+      &lt;/cac:ClassifiedTaxCategory&gt;
+    &lt;/cac:Item&gt;
+    &lt;cac:Price&gt;
+      &lt;cbc:PriceAmount currencyID="EUR"&gt;80.00&lt;/cbc:PriceAmount&gt;
+    &lt;/cac:Price&gt;
+  &lt;/cac:InvoiceLine&gt;
+&lt;/Invoice&gt;
+<span class="k">XMLEOF</span></pre>
+
+<p>Now validate it against Peppol Schematron rules:</p>
+
+<pre><span class="k">n42-edelivery validate peppol --document /tmp/test-invoice.xml</span></pre>
+
+<div class="callout">
+  <strong>🔍 Expected outcome:</strong> The invoice should pass validation — it was built from the Lesson 2 example. But the real value is seeing the <em>output format</em>: which Schematron rules were checked, the rule IDs, and how violations are reported. Try intentionally breaking something (e.g., change the VAT rate to 15%) and run validation again to see the error format.
+</div>
+
+<h2>Step 4: Probe the live Peppol network</h2>
+
+<p>You can query real Peppol participants right now. The OpenPeppol SMP Lookup is a public service. Let's use Node42's built-in SMP resolution:</p>
+
+<pre><span class="cm"># Resolve a participant — try the Netherlands Peppol Authority test OIN</span>
+<span class="k">n42-edelivery send peppol \</span>
+  <span class="k">--env test \</span>
+  <span class="k">--sender-id "iso6523-actorid-upis::9914:SK2023456789" \</span>
+  <span class="k">--receiver-id "iso6523-actorid-upis::0000:00000000000000000000" \</span>
+  <span class="k">--document /tmp/test-invoice.xml \</span>
+  <span class="k">--dryrun</span></pre>
+
+<p>The <code>--dryrun</code> flag is crucial — it performs the SML/SMP lookup and constructs the AS4 message but <strong>does not send</strong> it. This lets you see:</p>
+<ul>
+  <li>Whether the receiver exists and what documents they accept</li>
+  <li>The endpoint URL of their AP</li>
+  <li>Their encryption certificate (needed for the AS4 encryption)</li>
+  <li>The full AS4 message structure that would be sent</li>
+</ul>
+
+<p>You can also probe the network using the public web tools:</p>
+<table>
+  <tr><th>Tool</th><th>URL</th><th>What it does</th></tr>
+  <tr><td>OpenPeppol SMP Lookup</td><td><a href="https://lookup.peppol.org/">lookup.peppol.org</a></td><td>Web UI: search any Peppol participant by ID</td></tr>
+  <tr><td>Peppol Practical REST API</td><td><a href="https://peppol.helger.com/public/menuitem-tools-rest-api">peppol.helger.com</a></td><td>Free REST API for SMP queries, document conversion, participant checks</td></tr>
+  <tr><td>Netherlands PA Test Tool</td><td><a href="https://test.peppolautoriteit.nl/">test.peppolautoriteit.nl</a></td><td>Send test invoices to a test participant (requires an AS4-capable AP, but useful later)</td></tr>
+</table>
+
+<h2>Step 5: Create the AP Core project skeleton</h2>
+
+<p>Now let's create the minimal AP Core project structure that wraps Node42:</p>
+
+<pre><span class="k">cd ~/projects-dir/ideas/pepoll-access</span>
+<span class="k">mkdir -p ap-core/src</span>
+<span class="k">cd ap-core</span>
+<span class="k">npm init -y</span>
+<span class="k">npm install @n42/edelivery</span></pre>
+
+<p>Create the main entry point — a thin wrapper that exposes the AP Core interface (from our reference spec):</p>
+
+<pre><span class="k">cat > src/index.js &lt;&lt; 'JSEOF'</span>
+<span class="cm">// AP Core — entry point</span>
+<span class="cm">// Wraps Node42 and exposes the 5 operations from the AP Core Interface spec</span>
+
+const { send, validate, lookup } = require('@n42/edelivery');
+
+<span class="k">async function</span> start() {
+  console.log('🧩 AP Core starting...');
+  console.log('   Node42 version:', require('@n42/edelivery/package.json').version);
+
+  <span class="cm">// TODO Week 1: Implement send operation</span>
+  <span class="cm">// TODO Week 2: Implement receive webhook</span>
+  <span class="cm">// TODO Week 2: Implement getStatus</span>
+  <span class="cm">// TODO Week 3: Implement lookup + validate endpoints</span>
+  <span class="cm">// TODO Week 3: Certificate management</span>
+
+  console.log('✅ AP Core ready');
+  console.log('   📡 AS4 endpoint: https://ap.mojafaktura.sk:443/as4');
+  console.log('   🔌 Internal API: https://localhost:3001/api');
+}
+
+start().catch(console.error);
+<span class="k">JSEOF</span></pre>
+
+<p>Add a start script to <code>package.json</code>:</p>
+
+<pre><span class="k">node -e "</span>
+  const pkg = require('./package.json');
+  pkg.scripts = { start: 'node src/index.js' };
+  require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+<span class="k">"</span></pre>
+
+<h2>Step 6: Test the full validation pipeline</h2>
+
+<p>Let's write a small script that uses Node42 programmatically (not CLI) to validate documents — this is how the AP Core will work internally:</p>
+
+<pre><span class="k">cat > src/validate.js &lt;&lt; 'JSEOF'</span>
+<span class="cm">// AP Core — Validation module</span>
+<span class="cm">// Uses Node42's Schematron engine to validate UBL documents</span>
+
+const fs = require('fs');
+const path = require('path');
+
+<span class="k">class</span> Validator {
+  constructor() {
+    <span class="cm">// In production, Node42 loads Schematron from .node42/certs/</span>
+    <span class="cm">// We'll use the CLI's built-in schematron for now</span>
+    this.ready = false;
+  }
+
+  <span class="k">async</span> init() {
+    <span class="cm">// TODO: Initialize Schematron engine with bundled rules</span>
+    <span class="cm">// Peppol rules:  .node42/schematrons/billing/peppol-en16931-ubl.sef.json</span>
+    <span class="cm">// CEN rules:     .node42/schematrons/billing/cen-en16931-ubl.sef.json</span>
+    <span class="cm">// Slovak PASR:   (custom, to be created)</span>
+    this.ready = true;
+    console.log('   Validator initialized');
+  }
+
+  <span class="k">async</span> validate(ublXml) {
+    <span class="cm">// Delegates to Node42's validate command</span>
+    <span class="cm">// Returns { valid, errors: [{ rule, message, severity, location }] }</span>
+    console.log('   🔍 Running Schematron validation...');
+    <span class="cm">// TODO: Call Node42 validation API</span>
+    return { valid: true, errors: [] };
+  }
+
+  <span class="k">async</span> validateFile(filePath) {
+    const xml = fs.readFileSync(filePath, 'utf-8');
+    return this.validate(xml);
+  }
+}
+
+module.exports = Validator;
+<span class="k">JSEOF</span></pre>
+
+<h2>What you've achieved</h2>
+
+<table>
+  <tr><th>#</th><th>Done</th><th>What's next</th></tr>
+  <tr>
+    <td>✅</td>
+    <td>Node42 installed and initialized</td>
+    <td>Hooked into the AP Core project as a dependency</td>
+  </tr>
+  <tr>
+    <td>✅</td>
+    <td>Sample invoice validated against real Schematron</td>
+    <td>Integrated into an automated validation pipeline</td>
+  </tr>
+  <tr>
+    <td>✅</td>
+    <td>Probed the live Peppol network via public tools</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td>✅</td>
+    <td>AP Core skeleton created with Node42 dependency</td>
+    <td>Fleshing out the 5 interface operations</td>
+  </tr>
+  <tr>
+    <td>⬜</td>
+    <td>—</td>
+    <td>Getting test PKI certificates for actual AS4 sending</td>
+  </tr>
+  <tr>
+    <td>⬜</td>
+    <td>—</td>
+    <td>Setting up the AS4 receiver endpoint (port 443)</td>
+  </tr>
+  <tr>
+    <td>⬜</td>
+    <td>—</td>
+    <td>Peppol Testbed accreditation testing</td>
+  </tr>
+</table>
+
+<h2>Next steps toward sending</h2>
+
+<p>To actually send an AS4 message, you need <strong>test PKI certificates</strong>. The path is:</p>
+
+<ol>
+  <li><strong>Join OpenPeppol</strong> as a member (fee-based, starts at ~€2,000/year for small companies)</li>
+  <li><strong>Sign the Service Provider Agreement</strong> with the Slovak Peppol Authority (Finančné riaditeľstvo SR)</li>
+  <li><strong>Request test PKI certificates</strong> through the Peppol Service Desk</li>
+  <li><strong>Run the Peppol Testbed</strong> — automated tests that verify your AP sends/receives correctly</li>
+  <li><strong>Request production certificates</strong> → go live</li>
+</ol>
+
+<p>But you don't need to wait. You can build and test everything <strong>except the actual AS4 network call</strong> right now. The validation, SMP probing, webhook receiver, and AP Core interface are all fully developable today. When the certs arrive, you just plug them in and send.</p>
+
+<hr>
+
+<h2>📋 Commands reference for this lesson</h2>
+
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td><code>n42-edelivery --version</code></td><td>Check installed version</td></tr>
+  <tr><td><code>n42-edelivery init</code></td><td>Initialize .node42 workspace with certs + schematrons</td></tr>
+  <tr><td><code>n42-edelivery validate peppol --document file.xml</code></td><td>Validate UBL against Peppol Schematron</td></tr>
+  <tr><td><code>n42-edelivery send peppol --env test --dryrun ...</code></td><td>Dry-run: resolve SMP but don't send</td></tr>
+  <tr><td><code>n42-edelivery pki</code></td><td>Show current PKI configuration</td></tr>
+</table>
+
+<h2>🤔 Questions?</h2>
+<p>This was the first hands-on lesson. Did the installation work? Did the validation pass? Try breaking the invoice on purpose and see what error messages Node42 produces — that's the best way to understand the Schematron rules.</p>
+<p>From here, we can go deeper into any area: the Node42 source code (it's only ~500 lines of core transport logic), the AS4 message construction, the SMP lookup internals, or start planning the first accreditation steps.</p>
+
+<div class="footer">
+  <p>Lesson 5 of the Peppol Service Provider series. Focus: AP Core.</p>
+  <p>See also: <a href="../reference/ap-core-interface.html">AP Core Interface</a> | <a href="../reference/ap-core-validation-rules.html">Validation Rules</a></p>
+</div>
+
+</body>
+</html>

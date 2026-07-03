@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 3: AS4 Messaging — How Invoices Travel the Network</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  blockquote { border-left: 3px solid #2563eb; margin: 1.2em 0; padding: 0.6em 1em; background: #f0f4ff; font-style: italic; color: #2c3e50; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.75em; line-height: 1.4; }
+  pre .tag { color: #89b4fa; }
+  pre .attr { color: #a6e3a1; }
+  pre .val { color: #f9e2af; }
+  pre .cm { color: #6c7086; font-style: italic; }
+  pre .mh { color: #fab387; } /* MIME headers */
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .diagram { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.2em; margin: 1.2em 0; font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+</style>
+</head>
+<body>
+
+<h1>📡 Lesson 3: AS4 Messaging</h1>
+<p><em>How the UBL invoice XML travels across the Peppol network — the transport protocol.</em></p>
+
+<hr>
+
+<h2>From XML to wire</h2>
+
+<p>In Lesson 2 we saw the payload: a UBL XML invoice. But how does it actually get from the sender to the receiver? The journey goes through three layers:</p>
+
+<div class="diagram">
+  ┌────────────────────────────────────────────────────────────┐
+  │                    HTTPS (TLS v1.2+)                       │
+  │  ┌──────────────────────────────────────────────────────┐  │
+  │  │            AS4 = SOAP + WS-Security                  │  │
+  │  │  ┌────────────────────────────────────────────────┐  │  │
+  │  │  │     SBDH (Standard Business Document Header)   │  │  │
+  │  │  │  ┌──────────────────────────────────────────┐  │  │  │
+  │  │  │  │     UBL XML Invoice (payload)            │  │  │  │
+  │  │  │  └──────────────────────────────────────────┘  │  │  │
+  │  │  └────────────────────────────────────────────────┘  │  │
+  │  └──────────────────────────────────────────────────────┘  │
+  └────────────────────────────────────────────────────────────┘
+</div>
+
+<p>Your Access Point needs to speak all four layers. Fortunately, you don't have to write every byte from scratch — there are existing libraries. But understanding <em>what</em> happens at each layer is essential for debugging.</p>
+
+<h2>The complete flow: discovery + transport</h2>
+
+<p>Sending a Peppol invoice requires two phases. Let's trace the <strong>full journey</strong> from your SME customer clicking "Send" to the government agency receiving it:</p>
+
+<div class="diagram">
+  ╔══════════════════════════════════════════════════════════════╗
+  ║              PHASE 1: DISCOVERY                             ║
+  ║  (Finding out where to send the message)                    ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  Your AP                    SML                   SMP of Receiver
+    │                         │                       │
+    │ 1. SML lookup:          │                       │
+    │    participant SK449... │                       │
+    │────────────────────────→│                       │
+    │                         │                       │
+    │ 2. "Their SMP is at     │                       │
+    │    smp.gov.sk"          │                       │
+    │←────────────────────────│                       │
+    │                         │                       │
+    │ 3. Query: "What can     │                       │
+    │    SK449... receive?"   │                       │
+    │────────────────────────────────────────────────→│
+    │                         │                       │
+    │ 4. "They accept Invoice │                       │
+    │    at endpoint URL,     │                       │
+    │    here's their         │                       │
+    │    encryption cert"     │                       │
+    │←────────────────────────────────────────────────│
+    │                         │                       │
+
+  ╔══════════════════════════════════════════════════════════════╗
+  ║              PHASE 2: TRANSPORT (AS4)                       ║
+  ╚══════════════════════════════════════════════════════════════╝
+
+  Your AP                                      Receiving AP (gov)
+    │                                               │
+    │ 5. Build MIME multipart:                      │
+    │    - SOAP header (eb:Messaging)               │
+    │    - SBDH + UBL XML payload                   │
+    │    - Sign with our private key                │
+    │    - Encrypt with their public key            │
+    │                                               │
+    │ 6. POST / (HTTPS port 443) ─────────────────→ │
+    │                                               │
+    │ 7. Validate signature, decrypt                │
+    │ 8. Validate SBDH, extract UBL                 │
+    │ 9. Schematron-validate the invoice            │
+    │ 10. Route to government system                │
+    │                                               │
+    │ ←─── 11. AS4 Receipt (MDN) ────────────────── │
+    │       (signed acknowledgement)                │
+    │                                               │
+</div>
+
+<h2>Phase 1: Discovery (SML + SMP)</h2>
+
+<p>Before your AP can send anything, it needs to discover <strong>where</strong> to send it. Peppol uses two lookup services:</p>
+
+<h3>1. SML — Service Metadata Locator</h3>
+<p>A DNS-based root directory operated by OpenPeppol. Given a participant ID (e.g., <code>0088:SK4498765432</code>), it returns the URL of that participant's SMP. Think of it as DNS for Peppol — a simple domain name lookup.</p>
+
+<p>Example query pattern:</p>
+<pre>  Participant ID: 0088:SK4498765432
+  → SML query: b-0088-sk4498765432.iso6523-actorid-upis.sml.peppolcentral.org
+  → DNS CNAME result: smp.gov.sk</pre>
+
+<h3>2. SMP — Service Metadata Publisher</h3>
+<p>A directory operated by the receiving participant's service provider (or the government itself). It answers:</p>
+<ul>
+  <li><strong>What document types</strong> does this participant accept? (e.g., "Invoice, CreditNote")</li>
+  <li><strong>Which AP endpoint</strong> should the document be sent to? (e.g., <code>https://ap.gov.sk/as4</code>)</li>
+  <li><strong>What's their encryption certificate?</strong> (to encrypt the payload for them)</li>
+</ul>
+
+<div class="info">
+  <strong>💡 For your MVP:</strong> You can skip the SML/SMP discovery and receive documents without it. For sending, you need it to look up where to send. The <strong>Node42</strong> library handles this automatically. But you'll also need to register your own customers in <em>your</em> SMP so other APs can find them — more on that later.
+</div>
+
+<h2>Phase 2: Transport — AS4</h2>
+
+<p><strong>AS4</strong> (Applicability Statement 4) is a profile of the ebMS 3.0 standard. It defines the exact format for packaging, signing, encrypting, and exchanging business messages over the internet.</p>
+
+<h3>Key facts about Peppol AS4:</h3>
+<table>
+  <tr><th>Property</th><th>Value</th></tr>
+  <tr><td>Transport</td><td>HTTPS (TLS v1.2+)</td></tr>
+  <tr><td>Port</td><td><strong>443</strong> — both sending and receiving</td></tr>
+  <tr><td>Message pattern</td><td><strong>One-Way/Push</strong> only — your AP sends, their AP acknowledges. No pull, no sync.</td></tr>
+  <tr><td>Payload location</td><td>MIME attachments (not SOAP body)</td></tr>
+  <tr><td>AgreementRef</td><td><code>urn:fdc:peppol.eu:2017:agreements:tia:ap_provider</code> — fixed value</td></tr>
+  <tr><td>Compression</td><td>Optional (AS4 compression feature)</td></tr>
+</table>
+
+<h2>The SBDH — Routing Envelope</h2>
+
+<p>Every Peppol document is wrapped in a <strong>Standard Business Document Header (SBDH)</strong> before being placed into the AS4 message. This is the <em>routing</em> layer — it tells the receiving AP who sent it, who should get it, and what type of document is inside.</p>
+
+<pre><span class="cm">&lt;!-- SBDH — the routing envelope —&gt;</span>
+<span class="tag">&lt;StandardBusinessDocument</span>
+    <span class="attr">xmlns</span>=<span class="val">"http://www.unece.org/cefact/namespaces/StandardBusinessDocumentHeader"</span><span class="tag">&gt;</span>
+
+  <span class="tag">&lt;StandardBusinessDocumentHeader&gt;</span>
+    <span class="tag">&lt;HeaderVersion&gt;</span>1.0<span class="tag">&lt;/HeaderVersion&gt;</span>
+
+    <span class="cm">&lt;!-- Corner 1 (sender, the SME) --&gt;</span>
+    <span class="tag">&lt;Sender&gt;</span>
+      <span class="tag">&lt;Identifier</span> <span class="attr">Authority</span>=<span class="val">"iso6523-actorid-upis"</span><span class="tag">&gt;</span>
+        0088:SK2023456789
+      <span class="tag">&lt;/Identifier&gt;</span>
+    <span class="tag">&lt;/Sender&gt;</span>
+
+    <span class="cm">&lt;!-- Corner 4 (receiver, e.g. government) --&gt;</span>
+    <span class="tag">&lt;Receiver&gt;</span>
+      <span class="tag">&lt;Identifier</span> <span class="attr">Authority</span>=<span class="val">"iso6523-actorid-upis"</span><span class="tag">&gt;</span>
+        0088:SK4498765432
+      <span class="tag">&lt;/Identifier&gt;</span>
+    <span class="tag">&lt;/Receiver&gt;</span>
+
+    <span class="tag">&lt;DocumentIdentification&gt;</span>
+      <span class="tag">&lt;Standard&gt;</span>urn:oasis:names:specification:ubl:schema:xsd:Invoice-2<span class="tag">&lt;/Standard&gt;</span>
+      <span class="tag">&lt;TypeVersion&gt;</span>2.1<span class="tag">&lt;/TypeVersion&gt;</span>
+      <span class="tag">&lt;InstanceIdentifier&gt;</span>uuid:3a1b2c3d-...<span class="tag">&lt;/InstanceIdentifier&gt;</span>
+      <span class="tag">&lt;Type&gt;</span>Invoice<span class="tag">&lt;/Type&gt;</span>
+      <span class="tag">&lt;CreationDateAndTime&gt;</span>2026-06-15T10:30:00+02:00<span class="tag">&lt;/CreationDateAndTime&gt;</span>
+    <span class="tag">&lt;/DocumentIdentification&gt;</span>
+
+    <span class="tag">&lt;BusinessScope&gt;</span>
+      <span class="tag">&lt;Scope&gt;</span>
+        <span class="tag">&lt;Type&gt;</span>DOCUMENTID<span class="tag">&lt;/Type&gt;</span>
+        <span class="tag">&lt;InstanceIdentifier&gt;</span>
+          urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::
+          Invoice##urn:cen.eu:en16931:2017#compliant#
+          urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1
+        <span class="tag">&lt;/InstanceIdentifier&gt;</span>
+        <span class="tag">&lt;Identifier&gt;</span>busdox-docid-qns<span class="tag">&lt;/Identifier&gt;</span>
+      <span class="tag">&lt;/Scope&gt;</span>
+      <span class="tag">&lt;Scope&gt;</span>
+        <span class="tag">&lt;Type&gt;</span>PROCESSID<span class="tag">&lt;/Type&gt;</span>
+        <span class="tag">&lt;InstanceIdentifier&gt;</span>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0<span class="tag">&lt;/InstanceIdentifier&gt;</span>
+        <span class="tag">&lt;Identifier&gt;</span>cenbii-procid-ubl<span class="tag">&lt;/Identifier&gt;</span>
+      <span class="tag">&lt;/Scope&gt;</span>
+      <span class="tag">&lt;Scope&gt;</span>
+        <span class="tag">&lt;Type&gt;</span>COUNTRY_C1<span class="tag">&lt;/Type&gt;</span>
+        <span class="tag">&lt;InstanceIdentifier&gt;</span>SK<span class="tag">&lt;/InstanceIdentifier&gt;</span>
+      <span class="tag">&lt;/Scope&gt;</span>
+    <span class="tag">&lt;/BusinessScope&gt;</span>
+  <span class="tag">&lt;/StandardBusinessDocumentHeader&gt;</span>
+
+  <span class="cm">&lt;!-- The actual UBL XML invoice goes here --&gt;</span>
+  <span class="tag">&lt;Invoice</span> <span class="attr">xmlns</span>=<span class="val">"urn:oasis:names:..."</span><span class="tag">&gt;</span>
+    ...
+  <span class="tag">&lt;/Invoice&gt;</span>
+
+<span class="tag">&lt;/StandardBusinessDocument&gt;</span></pre>
+
+<div class="callout">
+  <strong>🔑 Key fields in SBDH:</strong>
+  <ul style="margin: 0.3em 0">
+    <li><strong>Sender/Receiver:</strong> Peppol participant IDs (the end users, not the APs — APs are identified separately in the AS4 header)</li>
+    <li><strong>InstanceIdentifier:</strong> A UUID that uniquely identifies this message transmission. Used for tracking and receipt matching.</li>
+    <li><strong>DOCUMENTID scope:</strong> The full document type identifier — this tells the receiver exactly which BIS spec the payload conforms to.</li>
+    <li><strong>PROCESSID scope:</strong> The business process (billing 01 = standard invoice).</li>
+  </ul>
+</div>
+
+<h2>The AS4 Message — MIME Multipart Structure</h2>
+
+<p>The AS4 message is a <strong>MIME multipart/related</strong> message sent over HTTPS. It contains three parts:</p>
+
+<pre><span class="mh">Content-Type: multipart/related; boundary="--=_MIME-Boundary"; type="application/xop+xml"</span>
+
+<span class="cm">── Part 1: SOAP Envelope (XML) ──</span>
+<span class="tag">&lt;soap:Envelope</span> <span class="attr">xmlns:soap</span>=<span class="val">"..."</span><span class="tag">&gt;</span>
+  <span class="tag">&lt;soap:Header&gt;</span>
+    <span class="tag">&lt;eb:Messaging</span> <span class="attr">xmlns:eb</span>=<span class="val">"http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/"</span><span class="tag">&gt;</span>
+      <span class="tag">&lt;eb:UserMessage&gt;</span>
+        <span class="tag">&lt;eb:MessageInfo&gt;</span>
+          <span class="tag">&lt;eb:Timestamp&gt;</span>2026-06-15T10:30:00Z<span class="tag">&lt;/eb:Timestamp&gt;</span>
+          <span class="tag">&lt;eb:MessageId&gt;</span>uuid:3a1b2c3d-...@ap.mojafaktura.sk<span class="tag">&lt;/eb:MessageId&gt;</span>
+        <span class="tag">&lt;/eb:MessageInfo&gt;</span>
+        <span class="tag">&lt;eb:PartyInfo&gt;</span>
+          <span class="cm">&lt;!-- Sending AP (Corner 2) --&gt;</span>
+          <span class="tag">&lt;eb:From&gt;</span>
+            <span class="tag">&lt;eb:PartyId</span> <span class="attr">type</span>=<span class="val">"urn:fdc:peppol.eu:2017:identifiers:ap"</span><span class="tag">&gt;</span>POP000123<span class="tag">&lt;/eb:PartyId&gt;</span>
+            <span class="tag">&lt;eb:Role&gt;</span>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/initiator<span class="tag">&lt;/eb:Role&gt;</span>
+          <span class="tag">&lt;/eb:From&gt;</span>
+          <span class="cm">&lt;!-- Receiving AP (Corner 3) --&gt;</span>
+          <span class="tag">&lt;eb:To&gt;</span>
+            <span class="tag">&lt;eb:PartyId</span> <span class="attr">type</span>=<span class="val">"urn:fdc:peppol.eu:2017:identifiers:ap"</span><span class="tag">&gt;</span>POP000456<span class="tag">&lt;/eb:PartyId&gt;</span>
+            <span class="tag">&lt;eb:Role&gt;</span>http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/responder<span class="tag">&lt;/eb:Role&gt;</span>
+          <span class="tag">&lt;/eb:To&gt;</span>
+        <span class="tag">&lt;/eb:PartyInfo&gt;</span>
+
+        <span class="tag">&lt;eb:CollaborationInfo&gt;</span>
+          <span class="tag">&lt;eb:AgreementRef&gt;</span>
+            urn:fdc:peppol.eu:2017:agreements:tia:ap_provider
+          <span class="tag">&lt;/eb:AgreementRef&gt;</span>
+          <span class="tag">&lt;eb:Service</span> <span class="attr">type</span>=<span class="val">"cenbii-procid-ubl"</span><span class="tag">&gt;</span>
+            urn:fdc:peppol.eu:2017:poacc:billing:01:1.0
+          <span class="tag">&lt;/eb:Service&gt;</span>
+          <span class="tag">&lt;eb:Action&gt;</span>
+            busdox-docid-qns::urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::
+            Invoice##urn:cen.eu:en16931:2017#compliant#
+            urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1
+          <span class="tag">&lt;/eb:Action&gt;</span>
+        <span class="tag">&lt;/eb:CollaborationInfo&gt;</span>
+
+        <span class="tag">&lt;eb:PayloadInfo&gt;</span>
+          <span class="tag">&lt;eb:PartInfo</span> <span class="attr">href</span>=<span class="val">"cid:payload@sender"</span><span class="tag">&gt;</span>
+            <span class="tag">&lt;eb:PartProperties&gt;</span>
+              <span class="tag">&lt;eb:Property</span> <span class="attr">name</span>=<span class="val">"originalSender"</span><span class="tag">&gt;</span>0088:SK2023456789<span class="tag">&lt;/eb:Property&gt;</span>
+              <span class="tag">&lt;eb:Property</span> <span class="attr">name</span>=<span class="val">"finalRecipient"</span><span class="tag">&gt;</span>0088:SK4498765432<span class="tag">&lt;/eb:Property&gt;</span>
+            <span class="tag">&lt;/eb:PartProperties&gt;</span>
+          <span class="tag">&lt;/eb:PartInfo&gt;</span>
+        <span class="tag">&lt;/eb:PayloadInfo&gt;</span>
+      <span class="tag">&lt;/eb:UserMessage&gt;</span>
+    <span class="tag">&lt;/eb:Messaging&gt;</span>
+
+    <span class="cm">&lt;!-- WS-Security: digital signature --&gt;</span>
+    <span class="tag">&lt;wsse:Security</span> <span class="attr">xmlns:wsse</span>=<span class="val">"..."</span><span class="tag">&gt;</span>
+      <span class="tag">&lt;wsse:BinarySecurityToken</span>
+        <span class="attr">ValueType</span>=<span class="val">"http://docs.oasis-open.org/wss/2004/01/
+          oasis-200401-wss-x509-token-profile-1.0#X509v3"</span>
+        <span class="attr">EncodingType</span>=<span class="val">"http://docs.oasis-open.org/wss/2004/01/
+          oasis-200401-wss-soap-message-security-1.0#Base64Binary"</span>
+        <span class="attr">wsu:Id</span>=<span class="val">"SenderCert"</span><span class="tag">&gt;</span>
+        [base64-encoded X.509 certificate of your AP]
+      <span class="tag">&lt;/wsse:BinarySecurityToken&gt;</span>
+      <span class="tag">&lt;ds:Signature&gt;</span>...<span class="tag">&lt;/ds:Signature&gt;</span>  <span class="cm">&lt;!-- XML-DSig over SOAP body --&gt;</span>
+    <span class="tag">&lt;/wsse:Security&gt;</span>
+  <span class="tag">&lt;/soap:Header&gt;</span>
+
+  <span class="tag">&lt;soap:Body&gt;</span>
+    <span class="cm">&lt;!-- Empty — payload is in the attachment --&gt;</span>
+    <span class="tag">&lt;xop:Include</span> <span class="attr">xmlns:xop</span>=<span class="val">"http://www.w3.org/2004/08/xop/include"</span>
+                <span class="attr">href</span>=<span class="val">"cid:payload@sender"</span><span class="tag">/&gt;</span>
+  <span class="tag">&lt;/soap:Body&gt;</span>
+<span class="tag">&lt;/soap:Envelope&gt;</span>
+
+<span class="cm">── Part 2: Payload (SBDH + UBL XML) ──</span>
+<span class="mh">Content-ID: &lt;cid:payload@sender&gt;</span>
+<span class="mh">Content-Type: application/xml</span>
+
+<span class="tag">&lt;StandardBusinessDocument&gt;</span>
+  <span class="tag">&lt;StandardBusinessDocumentHeader&gt;</span>
+    ... (SBDH from previous section) ...
+  <span class="tag">&lt;/StandardBusinessDocumentHeader&gt;</span>
+  <span class="tag">&lt;Invoice&gt;</span>
+    ... (UBL invoice from Lesson 2) ...
+  <span class="tag">&lt;/Invoice&gt;</span>
+<span class="tag">&lt;/StandardBusinessDocument&gt;</span></pre>
+
+<div class="info">
+  <strong>💡 The SOAP Body is empty.</strong> Peppol requires that all payloads be MIME attachments, not in the SOAP body. The SOAP body just contains an <code>xop:Include</code> reference — like a pointer saying "the real data is over here in the attachment." This is called <strong>XOP (XML-binary Optimized Packaging)</strong>.
+</div>
+
+<h2>Security: Two layers of encryption</h2>
+
+<table>
+  <tr><th>Layer</th><th>Certificate</th><th>Purpose</th></tr>
+  <tr><td><strong>TLS</strong> (transport)</td><td>Standard TLS cert (e.g., Let's Encrypt)</td><td>Encrypts the HTTPS connection between APs. Prevents eavesdropping on the wire. Must match the AP's domain name.</td></tr>
+  <tr><td><strong>AS4 message security</strong></td><td>Peppol PKI certificate (from approved CA)</td><td><strong>Signs</strong> the message (your AP's identity, non-repudiation) and <strong>encrypts</strong> the payload (only the receiving AP can decrypt). Uses the receiving AP's public key from the SMP.</td></tr>
+</table>
+
+<div class="callout">
+  <strong>⚠ Two different certificates!</strong> Your AP needs:
+  <ol>
+    <li><strong>TLS certificate</strong> for HTTPS — buy from any CA (Let's Encrypt is fine)</li>
+    <li><strong>Peppol PKI certificate</strong> for AS4 signing/encryption — issued through the Peppol Service Desk after accreditation</li>
+  </ol>
+  In the test environment, you can use self-signed for TLS and test PKI certs from OpenPeppol.
+</div>
+
+<h2>The Receipt (MDN)</h2>
+
+<p>After the receiving AP successfully processes your message, it sends back a <strong>signed receipt</strong> (Message Disposition Notification). This is a separate AS4 message that says: "I received message XYZ, the signature verified, the payload is valid." The receipt is itself digitally signed — this provides <strong>non-repudiation of receipt</strong>.</p>
+
+<p>Your AP must:</p>
+<ul>
+  <li><strong>Send</strong> receipts when receiving messages (mandatory)</li>
+  <li><strong>Receive and verify</strong> receipts when sending messages (store them as proof of delivery)</li>
+</ul>
+
+<h2>What this means for your code</h2>
+
+<p>Here's how the sending pipeline maps to functions in your Node.js AP:</p>
+
+<div class="diagram">
+  Function                                    What it does
+  ──────────                                  ────────────────────────────────
+  lookupSML(participantID)                    DNS query → SMP URL
+  querySMP(smpURL, participantID, docType)    HTTP GET → endpoint, cert
+  buildSBDH(sender, receiver, docType)        XML → SBDH envelope
+  buildSOAP(messageId, from, to, ...)         XML → eb:Messaging header
+  signMessage(soapEnvelope, privateKey)       XML-DSig → WS-Security
+  encryptPayload(payload, receiverCert)       RSA-OAEP + AES-128-GCM
+  buildMIME(soapEnvelope, encryptedPayload)   multipart/related
+  POST(url, mimeMessage)                      HTTPS → receiving AP
+  verifyReceipt(response, truststore)         Parse + validate MDN receipt
+</div>
+
+<div class="info">
+  <strong>🔧 Node42 to the rescue:</strong> The <a href="https://github.com/node42-dev/node42-edelivery">node42-edelivery</a> library is a <strong>pure Node.js</strong> toolkit that implements all of the above. No Java, no native dependencies, no external binaries. It handles:
+  <ul style="margin: 0.3em 0">
+    <li>SML lookup + SMP discovery</li>
+    <li>AS4 message construction, signing, encryption</li>
+    <li>MIME multipart assembly and HTTP POST</li>
+    <li>Schematron validation</li>
+    <li>Receipt generation and verification</li>
+  </ul>
+  You can use it as a CLI tool or integrate it as a library. This is your <strong>head start</strong> for the prototype — you don't need to write AS4 from scratch.
+</div>
+
+<h2>Receiving messages</h2>
+
+<p>Your AP must also <strong>receive</strong> AS4 messages. This means running an HTTPS server that:</p>
+<ol>
+  <li>Listens on port <strong>443</strong> (or behind a reverse proxy like Nginx)</li>
+  <li>Accepts POST requests with Content-Type <code>multipart/related</code></li>
+  <li>Parses the SOAP envelope, extracts the eb:Messaging header</li>
+  <li>Validates the sender's signature against their Peppol certificate</li>
+  <li>Decrypts the payload using your private key</li>
+  <li>Extracts the SBDH + UBL document</li>
+  <li>Validates the UBL with Schematron</li>
+  <li>Routes the document to your customer's inbox</li>
+  <li>Sends back a signed receipt (MDN)</li>
+</ol>
+
+<p>Node42 provides a receiver module too — check their <code>src/receiver/</code> directory for how to parse incoming AS4 messages.</p>
+
+<hr>
+
+<h2>✅ You can now explain</h2>
+<ol>
+  <li>The two phases: discovery (SML→SMP) and transport (AS4)</li>
+  <li>The three layers: UBL payload → SBDH envelope → AS4 SOAP message → HTTPS</li>
+  <li>What the SBDH contains and why it's separate from the AS4 header</li>
+  <li>The MIME multipart structure with SOAP header + payload attachment</li>
+  <li>Two-layer security: TLS (transport) vs AS4 (message-level signing + encryption)</li>
+  <li>How receipts (MDN) provide non-repudiation</li>
+  <li>That node42-edelivery exists and does most of this for you in pure Node.js</li>
+</ol>
+
+<h2>📚 Recommended reading</h2>
+<ul>
+  <li><a href="https://medium.com/@node42-dev/a-fully-working-peppol-as4-sender-in-node-js-in-500-lines-of-code-bad807b0e071">A Fully Working Peppol AS4 Sender in Node.js — In ~500 Lines of Code</a> (Medium article by Node42 author)</li>
+  <li><a href="https://medium.com/@node42-dev/peppol-as4-under-the-microscope-from-tcp-handshake-to-encrypted-invoice-4da0e02b4e3c">Peppol AS4 Under the Microscope: From TCP Handshake to Encrypted Invoice</a> (second article)</li>
+  <li><a href="https://github.com/node42-dev/node42-edelivery">node42-edelivery — GitHub repo</a></li>
+  <li><a href="https://docs.peppol.eu/edelivery/as4/specification/">Peppol AS4 Profile — official spec</a></li>
+  <li><a href="https://docs.peppol.eu/edelivery/envelope/Peppol-EDN-Business-Message-Envelope-2.0.1-2023-08-17.pdf">Peppol Business Message Envelope (SBDH) spec</a></li>
+</ul>
+
+<h2>🤔 Questions?</h2>
+<p>This was the most technical lesson so far. The AS4 protocol is <em>the</em> core of what your AP does — sending and receiving messages. If anything is unclear, or you want me to zoom in on a specific part (e.g., the actual XML signature process, how encryption works, how the SMP discovery API looks), just ask.</p>
+
+<p>Next up: <strong>Lesson 4: High-Level Architecture &amp; Project Setup</strong> — where we start laying out the actual Node.js project structure, the PostgreSQL schema, and the API design.</p>
+
+<div class="footer">
+  <p>Lesson 3 of the Peppol Service Provider series. Next: <em>Lesson 4: High-Level Architecture &amp; Project Setup</em>.</p>
+  <p>See also: <a href="../reference/glossary.html">Glossary</a> | <a href="../reference/ubl-invoice-reference.html">UBL Reference</a></p>
+</div>
+
+</body>
+</html>

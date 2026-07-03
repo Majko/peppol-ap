@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peppol Glossary — Reference</title>
+<style>
+  body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.5; color: #333; max-width: 800px; margin: 0 auto; padding: 3em 2em; background: #fafaf8; }
+  h1 { font-size: 2em; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.3em; margin-top: 2em; color: #1e40af; }
+  dl { margin: 1em 0; }
+  dt { font-weight: 700; color: #111; margin-top: 1.2em; padding: 0.2em 0; border-bottom: 1px solid #ddd; font-family: "SF Mono", "Fira Code", monospace; font-size: 1.1em; }
+  dd { margin: 0.3em 0 0.5em 1.2em; padding-left: 0.5em; border-left: 2px solid #ddd; }
+  .also-known { font-size: 0.85em; color: #666; font-style: italic; }
+  .badge { display: inline-block; background: #1e40af; color: #fff; font-size: 0.7em; padding: 0.15em 0.6em; border-radius: 3px; vertical-align: middle; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  a { color: #2563eb; }
+  @media print { body { font-size: 12pt; } }
+</style>
+</head>
+<body>
+
+<h1>📘 Peppol Glossary</h1>
+<p><em>All terms used in this teaching series. Kept consistent across lessons.</em></p>
+
+<dl>
+
+  <dt>4-Corner Model</dt>
+  <dd>The Peppol network topology: Buyer (C1) → Sending AP (C2) → Receiving AP (C3) → Seller (C4). No direct connections between end-users; all traffic flows through certified Access Points.</dd>
+
+  <dt>Access Point (AP)</dt>
+  <dd>The server software that sends and receives Peppol business documents on behalf of end-users. Must be certified through OpenPeppol and a Peppol Authority. You will build this.</dd>
+
+  <dt>AS4</dt>
+  <dd>The transport protocol used in Peppol. A profile of ebMS 3.0 that defines how messages are packaged, signed, encrypted, and delivered over HTTPS. Stands for "Applicability Statement 4."</dd>
+
+  <dt>BIS — Business Interoperability Specification</dt>
+  <dd>OpenPeppol's specification that defines a specific business document (e.g., BIS Billing 3.0 for invoices). Includes the data model, XML schema, Schematron rules, and code lists.</dd>
+
+  <dt>BIS Billing 3.0</dt>
+  <dd>The current mandatory Peppol specification for invoices and credit notes. Based on the European standard EN 16931. Uses UBL 2.1 XML or CII syntax. This is what you'll implement.</dd>
+
+  <dt>C1 / C2 / C3 / C4</dt>
+  <dd>Shorthand for the four corners: C1 = Buyer/End User, C2 = Sending AP, C3 = Receiving AP, C4 = Seller/End User.</dd>
+
+  <dt>CII — Cross-Industry Invoice</dt>
+  <dd>An alternative XML syntax for e-invoices (ISO/TS 20022-5). Peppol BIS Billing supports both UBL 2.1 and CII. UBL is more common in practice.</dd>
+
+  <dt>CIUS — Core Invoice Usage Specification</dt>
+  <dd>A national or sector-specific subset/rules on top of EN 16931. Slovakia may publish a CIUS for Slovak-specific invoicing requirements.</dd>
+
+  <dt>ebMS 3.0</dt>
+  <dd>OASIS standard "ebXML Messaging Services 3.0." AS4 is a profile of this standard. Defines how messages are packaged, routed, and acknowledged.</dd>
+
+  <dt>EN 16931</dt>
+  <dd>The European standard for e-invoicing. Defines the semantic data model that all EU member states must accept. Peppol BIS Billing 3.0 is a CIUS of EN 16931.</dd>
+
+  <dt>OpenPeppol</dt>
+  <dd>The international non-profit association (AISBL, Brussels) that owns and governs the Peppol specifications and the Peppol Network. All service providers must be members.</dd>
+
+  <dt>PASR — Peppol Authority Specific Requirements</dt>
+  <dd>Additional rules that a national Peppol Authority (e.g., Slovak Financial Directorate) imposes within its jurisdiction. In Slovakia, this includes a centralised SMP and Slovak TDD (technical design document).</dd>
+
+  <dt>Peppol Authority (PA)</dt>
+  <dd>A national body delegated by OpenPeppol to oversee Peppol implementation in a country. For Slovakia: <strong>Financial Directorate of the Slovak Republic</strong> (Finančné riaditeľstvo SR). Contact: <code>efaktura@financnasprava.sk</code></dd>
+
+  <dt>Peppol Network</dt>
+  <dd>The collective infrastructure of certified Access Points, SMPs, and the SML, governed by OpenPeppol rules. Not a physical network — it's a legal and technical framework.</dd>
+
+  <dt>PKI Certificate</dt>
+  <dd>X.509 certificate used for signing and encrypting AS4 messages. Must be obtained through the Peppol Service Desk from an approved Certificate Authority. Two types: signing/encryption certificate (Peppol-issued) and TLS certificate (any trusted CA).</dd>
+
+  <dt>SBDH — Standard Business Document Header</dt>
+  <dd>The XML envelope that wraps every Peppol business document. Contains sender ID, receiver ID, document type (e.g., <code>urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017##compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1</code>), and instance identifier.</dd>
+
+  <dt>SML — Service Metadata Locator</dt>
+  <dd>A DNS-based root directory operated by OpenPeppol. Given a participant ID, it returns the SMP URL for that participant. You don't build this.</dd>
+
+  <dt>SMP — Service Metadata Publisher</dt>
+  <dd>A directory service that publishes what document types a participant can receive and which AP handles their traffic. You may need to operate one for your customers (required by Slovak PASR).</dd>
+
+  <dt>SPA — Service Provider Agreement</dt>
+  <dd>The legal contract between a Peppol Authority and a service provider. Governs the rights and obligations of operating an AP.</dd>
+
+  <dt>Schematron</dt>
+  <dd>A rule-based validation language. Peppol BIS specs include Schematron rules that go beyond XSD validation — e.g., "if VAT category is 'standard', VAT rate must be 23%" (Slovak VAT rate).</dd>
+
+  <dt>Testbed</dt>
+  <dd>OpenPeppol's automated testing environment. New service providers must pass Testbed scenarios to prove their AP correctly sends/receives BIS-compliant documents.</dd>
+
+  <dt>TLS Certificate</dt>
+  <dd>Separate from the Peppol PKI certificate. Used for HTTPS. Can be from any well-known CA (Let's Encrypt, etc.). Self-signed certificates are NOT allowed in production.</dd>
+
+  <dt>UBL — Universal Business Language</dt>
+  <dd>An OASIS standard XML vocabulary for business documents (ISO/IEC 19845). Peppol BIS uses UBL 2.1. Key document types: <code>Invoice</code>, <code>CreditNote</code>, <code>Order</code>, etc.</dd>
+
+  <dt>ViDA — VAT in the Digital Age</dt>
+  <dd>An EU initiative mandating digital real-time VAT reporting. Drives the 2027 Slovakia mandate and the 2030 cross-border expansion.</dd>
+
+</dl>
+
+<hr>
+
+<p><em>Maintained alongside the Peppol Service Provider teaching series. Last updated: July 2026.</em></p>
+<p><a href="../lessons/0001-the-peppol-ecosystem.html">← Back to Lesson 1</a></p>
+
+</body>
+</html>
