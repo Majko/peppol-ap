@@ -14,7 +14,12 @@
     "test:coverage": "vitest run --coverage",
     "verify": "node examples/verify-standalone.js",
     "start": "node server/index.js --start",
-    "demo": "node examples/demo-accounting-app.js"
+    "start:sim": "node server/index.js --start --simulate",
+    "demo": "node examples/demo-accounting-app.js",
+    "sim:receive": "node server/simulate.js receive",
+    "sim:send": "node server/simulate.js send",
+    "sim:register": "node server/simulate.js register",
+    "sim:participants": "node server/simulate.js participants"
   },
   "keywords": [
     "peppol",

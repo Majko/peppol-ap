@@ -24,6 +24,7 @@
 import express from 'express';
 import cors from 'cors';
 import * as apCore from '../src/index.js';
+import * as simulator from '../src/simulator.js';
 import { generateInvoice, generateCreditNote } from '../src/ubl/generator.js';
 import { parseUBL } from '../src/ubl/parser.js';
 import { buildSBDH } from '../src/as4/sbdh.js';
@@ -74,6 +75,10 @@ export function createApp() {
         receive:   { method: 'POST',   path: '/api/receive',     body: 'Raw AS4 MIME message' },
         generate:  { method: 'POST',   path: '/api/generate',    body: 'Invoice JSON data → UBL XML' },
         buildAs4:  { method: 'POST',   path: '/api/build-as4',   body: 'Build full AS4 MIME message' },
+        simInject: { method: 'POST',   path: '/api/simulate/inject',       body: 'Simulate receiving an AS4 message from another AP' },
+        simSend:   { method: 'POST',   path: '/api/simulate/send',         body: 'Simulate sending (returns MDN receipt)' },
+        simParts:  { method: 'GET',    path: '/api/simulate/participants', desc: 'List simulated participants' },
+        simReg:    { method: 'POST',   path: '/api/simulate/participants', body: '{ id, name? } Register a participant' },
       },
     });
   });
@@ -216,6 +221,96 @@ export function createApp() {
     }
   });
 
+  // ─── POST /api/simulate/inject — Simulate incoming AS4 message ────
+
+  app.post('/api/simulate/inject', async (req, res) => {
+    try {
+      const { senderId, receiverId, ublXml, invoiceData, senderApId } = req.body;
+
+      let xml = ublXml;
+      if (!xml && invoiceData) {
+        xml = generateInvoice(invoiceData);
+      }
+      if (!xml) {
+        return res.status(400).json({ error: 'bad_request', details: [{ message: 'ublXml or invoiceData required' }] });
+      }
+
+      const s = senderId || '9914:SK5599887766';
+      const r = receiverId || '9914:SK2023456789';
+      const apId = senderApId || 'POP000999';
+
+      simulator.registerParticipant(s, { name: 'External: ' + s });
+
+      const { as4Message, messageId } = await simulator.buildInboundAS4Message({
+        senderId: s,
+        receiverId: r,
+        ublXml: xml,
+        senderApId: apId,
+      });
+
+      const result = await apCore.handleIncomingMessage(as4Message);
+
+      res.json({ ...result, injectedMessageId: messageId });
+    } catch (err) {
+      console.error('POST /api/simulate/inject error:', err);
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
+  });
+
+  // ─── GET /api/simulate/participants — List simulated participants ────
+
+  app.get('/api/simulate/participants', (_req, res) => {
+    res.json({
+      count: simulator.listParticipants().length,
+      participants: simulator.listParticipants(),
+    });
+  });
+
+  // ─── POST /api/simulate/participants — Register a participant ────
+
+  app.post('/api/simulate/participants', (req, res) => {
+    try {
+      const { id, name, country } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: 'bad_request', details: [{ message: 'id is required' }] });
+      }
+      simulator.registerParticipant(id, { name, country });
+      res.json({ success: true, id });
+    } catch (err) {
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
+  });
+
+  // ─── POST /api/simulate/send — Simulate sending (bypasses real network) ────
+
+  app.post('/api/simulate/send', async (req, res) => {
+    try {
+      const { senderId, receiverId, ublXml, invoiceData, documentType } = req.body;
+
+      let xml = ublXml;
+      if (!xml && invoiceData) {
+        xml = documentType === 'credit_note'
+          ? generateCreditNote(invoiceData)
+          : generateInvoice(invoiceData);
+      }
+      if (!xml) {
+        return res.status(400).json({ error: 'bad_request', details: [{ message: 'ublXml or invoiceData required' }] });
+      }
+
+      const s = senderId || '9914:SK2023456789';
+      const r = receiverId || '0088:SK4498765432';
+
+      simulator.registerParticipant(s);
+      simulator.registerParticipant(r);
+
+      const result = await simulator.simulateSend(s, r, xml, documentType);
+      res.json(result);
+    } catch (err) {
+      console.error('POST /api/simulate/send error:', err);
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
+  });
+
   // ─── POST /api/generate ───────────────────────
 
   app.post('/api/generate', (req, res) => {
@@ -334,11 +429,19 @@ const isMain = process.argv[1]?.endsWith('server/index.js') ||
 
 if (isMain) {
   const PORT = parseInt(process.env.PORT || '3001', 10);
+
+  // Enable simulation mode when --simulate is passed
+  const hasSimulate = process.argv.includes('--simulate');
+  if (hasSimulate) {
+    apCore.enableSimulation();
+  }
+
   const app = createApp();
   app.listen(PORT, () => {
+    const mode = hasSimulate ? '🔄 SIMULATION' : '🌐 LIVE (requires Peppol network)';
     console.log(`
 ╔══════════════════════════════════════════════════════╗
-║     🇸🇰  Peppol AP Core — Simulated Environment     ║
+║     🇸🇰  Peppol AP Core — ${mode.padEnd(29)}║
 ╠══════════════════════════════════════════════════════╣
 ║                                                      ║
 ║  Server:    http://localhost:${String(PORT).padEnd(5)}                     ║
@@ -348,6 +451,7 @@ if (isMain) {
 ║  Lookup:    GET  http://localhost:${PORT}/api/lookup/ ║
 ║  Status:    GET  http://localhost:${PORT}/api/status/ ║
 ║  TXs:       GET  http://localhost:${PORT}/api/txs     ║
+║  Simulate:  POST http://localhost:${PORT}/api/simulate/*║
 ║                                                      ║
 ║  Accounting app → POST JSON/XML to /api/send         ║
 ║                                                      ║

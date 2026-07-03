@@ -19,9 +19,36 @@ import { validateUBL } from './ubl/validator.js';
 import { buildSBDH, parseSBDH } from './as4/sbdh.js';
 import { buildAS4Message, parseAS4Message } from './as4/message.js';
 import * as node42 from './as4/node42.js';
+import * as simulator from './simulator.js';
 
 // In-memory transaction store
 const transactions = new Map();
+
+// Simulation mode (no external network calls needed)
+let simulationMode = false;
+
+/**
+ * Enable simulation mode — all Peppol network operations happen in-memory.
+ * No DNS/SML/SMP lookups, no real AS4 transport. Returns realistic MDN receipts.
+ * Perfect for development, testing, and demo environments.
+ */
+export function enableSimulation() {
+  simulationMode = true;
+}
+
+/**
+ * Disable simulation mode and use real Peppol network
+ */
+export function disableSimulation() {
+  simulationMode = false;
+}
+
+/**
+ * Check if simulation mode is active
+ */
+export function isSimulationEnabled() {
+  return simulationMode;
+}
 
 // Webhook registration
 let webhookConfig = null;
@@ -112,13 +139,50 @@ export async function sendInvoice(params) {
   };
   const sbdhXml = buildSBDH(sbdhParams);
 
-  // Step 5: Try to lookup receiver (simulated - in production this queries SML/SMP)
+  // Step 5: Lookup receiver and send
+  if (simulationMode) {
+    // ── SIMULATION MODE ────────────────────────────────────────────────────────
+    // Use the simulated network: in-memory participant lookup, realistic MDN receipt
+    const simResult = await simulator.simulateSend(
+      senderId,
+      receiverId,
+      ublXml,
+      docType
+    );
+
+    const tx = {
+      messageId: simResult.messageId,
+      direction: 'send',
+      status: 'delivered',
+      senderId,
+      receiverId,
+      documentType: docType,
+      sbdhXml,
+      ublXml,
+      receiptXml: simResult.receipt,
+      receiptMessageId: simResult.receiptMessageId,
+      timestamp: simResult.timestamp,
+      completedAt: simResult.timestamp,
+      simulated: true,
+    };
+    transactions.set(simResult.messageId, tx);
+
+    return {
+      messageId: simResult.messageId,
+      status: 'delivered',
+      receipt: simResult.receipt,
+      timestamp: simResult.timestamp,
+      simulated: true,
+    };
+  }
+
+  // ── PRODUCTION/TEST MODE ───────────────────────────────────────────────────
+  // Try real SMP lookup via Node42
   let lookupResult;
   try {
     lookupResult = await lookupParticipant(receiverId);
   } catch (lookupErr) {
-    // In test mode, we still proceed with a simulated send
-    // Record the transaction
+    // In offline environments, still record the transaction
     const tx = {
       messageId,
       direction: 'send',
@@ -146,7 +210,7 @@ export async function sendInvoice(params) {
     };
   }
 
-  // Step 6: Build AS4 message
+  // Build AS4 message
   const as4Message = buildAS4Message({
     messageId,
     fromApId: config.apId,
@@ -159,7 +223,7 @@ export async function sendInvoice(params) {
     timestamp,
   });
 
-  // Step 7: Record transaction
+  // Record transaction
   const tx = {
     messageId,
     direction: 'send',
@@ -363,6 +427,10 @@ export async function lookupParticipant(participantId) {
     throw new Error(
       `Invalid participant ID: "${participantId}". Both scheme and value required.`
     );
+  }
+
+  if (simulationMode) {
+    return simulator.simulatedLookup(participantId);
   }
 
   // Use Node42 for real SML→SMP lookup
@@ -575,6 +643,7 @@ export function getHealth() {
     status: 'ok',
     version: '1.0.0',
     mode: config.mode,
+    simulationMode,
     apId: config.apId,
     uptime: process.uptime(),
     transactionCount: transactions.size,
