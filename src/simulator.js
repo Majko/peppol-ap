@@ -147,7 +147,7 @@ export async function buildInboundAS4Message({ senderId, receiverId, ublXml, sen
   const timestamp = new Date().toISOString();
   const docTypeUpper = documentType === 'credit_note' ? 'CreditNote' : 'Invoice';
   const ns = `urn:oasis:names:specification:ubl:schema:xsd:${docTypeUpper}-2`;
-  const docTypeIdentifier = `${ns}::${docTypeUpper}##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1`;
+  const documentTypeIdentifier = `${ns}::${docTypeUpper}##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1`;
 
   const sbdhXml = buildSBDH({
     senderId,
