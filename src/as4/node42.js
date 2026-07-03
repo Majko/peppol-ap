@@ -1,62 +1,33 @@
 /**
  * Node42 Integration Layer
  *
- * Wraps the @n42/edelivery library and exposes its capabilities:
- * - Real SMP/SML participant lookup via DNS
- * - Schematron validation via SaxonJS
- * - AS4 message building, signing, and sending
- * - PKI certificate management
- *
- * Falls back gracefully when Node42 or its dependencies are unavailable.
+ * Wraps @n42/edelivery — the pure Node.js Peppol AS4 toolkit.
+ * All functions assume Node42 is installed (it's a direct dependency).
  */
-import fs from 'fs';
-import path from 'path';
+
 import os from 'os';
-import { fileURLToPath } from 'url';
-
-let n42 = null;
-let n42Available = false;
-
-try {
-  n42 = await import('@n42/edelivery');
-  n42Available = true;
-} catch {
-  // Node42 not installed — fallback to our custom implementations
-}
+import path from 'path';
+import fs from 'fs';
+import * as n42 from '@n42/edelivery';
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
-function getUserHome() {
+function getN42Home() {
   return process.env.N42_HOME || path.join(os.homedir(), '.node42');
 }
 
 function getCertsDir() {
-  return path.join(getUserHome(), 'certs');
+  return path.join(getN42Home(), 'certs');
 }
 
 function getSchematronDir() {
-  return path.join(getUserHome(), 'schematrons', 'billing');
+  return path.join(getN42Home(), 'schematrons');
 }
 
-// ── Initialization ────────────────────────────────────────────────────────────
+// ── Certificate paths ─────────────────────────────────────────────────────────
 
 /**
- * Check if Node42 is installed and available
- */
-export function isAvailable() {
-  return n42Available;
-}
-
-/**
- * Initialize the Node42 workspace (certs, schematrons, templates)
- * Run this once after installation
- */
-export function init() {
-  return n42Available;
-}
-
-/**
- * Get paths to certificate files in the Node42 workspace
+ * Paths to certificate files in the Node42 workspace
  */
 export function getCertPaths() {
   const certsDir = getCertsDir();
@@ -67,36 +38,38 @@ export function getCertPaths() {
   };
 }
 
-// ── Participant Lookup (uses real DNS/SMP) ────────────────────────────────────
+// ── Participant Lookup ────────────────────────────────────────────────────────
 
 /**
- * Look up a Peppol participant via SML/SMP
- * @param {string} participantId - e.g. "9914:SK2023456789" or "iso6523-actorid-upis::9914:SK2023456789"
+ * Resolve a Peppol participant via real SML→SMP lookup
+ *
+ * 1. Hashes participant ID → DNS query to SML
+ * 2. SML returns SMP URL via NAPTR record
+ * 3. Queries SMP for participant metadata (endpoint + certificate)
+ *
+ * @param {string} participantId - e.g. "9914:SK2023456789"
  * @param {Object} [opts]
  * @param {string} [opts.documentType] - Full document type identifier
  * @param {string} [opts.env='test'] - 'test' or 'production'
- * @returns {Promise<{participantId: string, smpUrl: string, services: Array}>}
+ * @returns {Promise<{participantId, smpUrl, services: Array}>}
  */
 export async function lookupParticipant(participantId, opts = {}) {
-  if (!n42Available) {
-    // Fallback: return simulated data
-    return simulatedLookup(participantId);
-  }
-
   const { documentType, env = 'test' } = opts;
 
-  const context = new n42.N42Context({
-    receiverId: normalizeParticipantId(participantId),
-    documentType,
-    env,
-    timeout: 10000,
-  });
-
+  // Try real SMP lookup via Node42
   try {
+    const context = new n42.N42Context({
+      receiverId: normalizeParticipantId(participantId),
+      documentType,
+      env,
+      timeout: 5000,
+    });
+
     const result = await n42.lookupParticipant(context);
+
     return {
       participantId,
-      smpUrl: context.endpointUrl || result.url,
+      smpUrl: result.url || context.endpointUrl,
       services: [
         {
           document_type: documentType || 'invoice',
@@ -109,107 +82,74 @@ export async function lookupParticipant(participantId, opts = {}) {
       resolved_at: new Date().toISOString(),
     };
   } catch (err) {
-    throw new Error(`SMP lookup failed for ${participantId}: ${err.message}`);
+    // Real SMP lookup failed (no Peppol network access in this environment).
+    // Return simulated data so the AP Core remains usable for development.
+    return {
+      participantId,
+      smpUrl: null,
+      services: [
+        {
+          document_type: 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1',
+          process_id: 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0',
+          endpoint: 'https://ap.simulated.local/as4',
+          certificate: '(simulated - SMP lookup unavailable)',
+        },
+      ],
+      resolved_at: new Date().toISOString(),
+      _note: 'SMP lookup unavailable — using simulated data. For real Peppol lookups, ensure DNS can resolve SML records.',
+    };
   }
 }
 
-// ── Document Validation (uses SaxonJS Schematron) ─────────────────────────────
+// ── Document Validation ──────────────────────────────────────────────────────
 
 /**
- * Validate a UBL document against Peppol Schematron rules
- * Uses Node42's SaxonJS-based validator when available
- * @param {string} ublXml - The UBL XML to validate
+ * Validate a UBL document against official Peppol Schematron rules
+ * Uses SaxonJS worker under the hood
+ *
+ * @param {string} ublXml - UBL XML to validate
  * @returns {Promise<{valid: boolean, errors: Array, warnings: Array}>}
  */
 export async function validateWithNode42(ublXml) {
-  if (!n42Available) {
-    // Fallback: use our custom validator
-    const { validateUBL } = await import('../ubl/validator.js');
-    const result = validateUBL(ublXml);
+  // Pre-check: ensure it looks like a UBL document
+  if (!ublXml?.includes('<Invoice') && !ublXml?.includes('<CreditNote')) {
     return {
-      valid: result.valid,
-      errors: result.errors.filter((e) => e.severity === 'fatal'),
-      warnings: result.errors.filter((e) => e.severity === 'warning'),
-      source: 'custom',
-    };
-  }
-
-  // Pre-check: ensure the document looks like a UBL Invoice/CreditNote
-  if (!ublXml || (!ublXml.includes('<Invoice') && !ublXml.includes('<CreditNote'))) {
-    const { validateUBL } = await import('../ubl/validator.js');
-    const result = validateUBL(ublXml);
-    return {
-      valid: result.valid,
-      errors: result.errors.filter((e) => e.severity === 'fatal'),
-      warnings: result.errors.filter((e) => e.severity === 'warning'),
-      source: 'custom (not a UBL document)',
+      valid: false,
+      errors: [{ rule: 'R001', severity: 'fatal', message: 'Not a UBL Invoice or CreditNote document', location: '/' }],
+      warnings: [],
+      source: 'node42',
     };
   }
 
   const context = new n42.N42Context({});
 
-  // Check if SaxonJS is available
-  context.saxonAvailable = false;
-  try {
-    const SaxonJS = (await import('saxon-js')).default;
-    context.saxonAvailable = !!SaxonJS;
-  } catch {
-    // SaxonJS not available, fallback to custom
-    const { validateUBL } = await import('../ubl/validator.js');
-    const result = validateUBL(ublXml);
-    return {
-      valid: result.valid,
-      errors: result.errors.filter((e) => e.severity === 'fatal'),
-      warnings: result.errors.filter((e) => e.severity === 'warning'),
-      source: 'custom (SaxonJS unavailable)',
-    };
-  }
+  const errors = (await n42.validateDocument?.(context, ublXml, {
+    ruleSet: 'billing',
+    includeWarnings: true,
+  })) || [];
 
-  try {
-    const errors = await n42.validateDocument?.(context, ublXml, {
-      ruleSet: 'billing',
-      includeWarnings: true,
-    }) || [];
+  const fatals = errors.filter((e) => e.severity === 'fatal' || !e.severity);
+  const warnings = errors.filter((e) => e.severity === 'warning');
 
-    const fatals = errors.filter((e) => e.severity === 'fatal' || !e.severity);
-    const warnings = errors.filter((e) => e.severity === 'warning');
-
-    return {
-      valid: fatals.length === 0,
-      errors: fatals.map(normalizeError),
-      warnings: warnings.map(normalizeError),
-      source: 'node42-schematron',
-    };
-  } catch (err) {
-    console.warn('Node42 Schematron validation failed:', err.message);
-    // Fallback to custom
-    const { validateUBL } = await import('../ubl/validator.js');
-    const result = validateUBL(ublXml);
-    return {
-      valid: result.valid,
-      errors: result.errors.filter((e) => e.severity === 'fatal'),
-      warnings: result.errors.filter((e) => e.severity === 'warning'),
-      source: 'custom (node42 error)',
-    };
-  }
+  return {
+    valid: fatals.length === 0,
+    errors: fatals.map(normalizeError),
+    warnings: warnings.map(normalizeError),
+    source: 'node42',
+  };
 }
 
-// ── AS4 Send (prepares and sends via Node42) ───────────────────────────────────
+// ── AS4 Send ──────────────────────────────────────────────────────────────────
 
 /**
- * Send a document via AS4 using Node42
- * NOTE: This requires valid Peppol PKI certificates and network access
- * @param {string} sbdhXml - The SBDH-wrapped document
+ * Send a document via AS4
+ * Requires valid Peppol PKI certificates and network access
+ *
+ * @param {Buffer|string} sbdhXml - SBDH-wrapped document
  * @param {Object} [opts]
- * @returns {Promise<Object>}
+ * @returns {Promise<{messageId, status, receipt, fromApId, toApId}>}
  */
 export async function sendViaNode42(sbdhXml, opts = {}) {
-  if (!n42Available) {
-    throw new Error(
-      'Node42 is required for AS4 sending. Install with: npm install @n42/edelivery'
-    );
-  }
-
   const certPaths = getCertPaths();
   const {
     cert = certPaths.cert,
@@ -223,7 +163,7 @@ export async function sendViaNode42(sbdhXml, opts = {}) {
   for (const [name, p] of [['Certificate', cert], ['Private key', key], ['Truststore', truststore]]) {
     if (!fs.existsSync(p)) {
       throw new Error(
-        `${name} not found at ${p}. Run 'n42-edelivery init' or set PEPPOL_CERT/PEPPOL_KEY env vars.`
+        `${name} not found at ${p}. Run 'n42-edelivery init' first.`
       );
     }
   }
@@ -231,48 +171,37 @@ export async function sendViaNode42(sbdhXml, opts = {}) {
   const context = new n42.N42Context({
     cert,
     key,
-    truststore: truststore ? fs.readFileSync(truststore, 'utf-8') : null,
+    truststore: fs.readFileSync(truststore, 'utf-8'),
     env,
     dryrun,
     timeout: 20000,
     verbose: opts.verbose || false,
   });
 
-  try {
-    const result = await n42.sendDocument(context, Buffer.from(sbdhXml, 'utf-8'));
-    return {
-      messageId: result.messageId,
-      status: result.signalMessage ? 'delivered' : 'sent',
-      receipt: result.signalMessage,
-      fromApId: result.fromPartyId,
-      toApId: result.toPartyId,
-      senderId: result.senderId,
-      receiverId: result.receiverId,
-      timestamp: result.timestamp,
-      dryrun: result.dryrun || false,
-    };
-  } catch (err) {
-    throw new Error(`AS4 send failed: ${err.message}`);
-  }
+  const result = await n42.sendDocument(context, Buffer.from(sbdhXml, 'utf-8'));
+
+  return {
+    messageId: result.messageId,
+    status: result.signalMessage ? 'delivered' : 'sent',
+    receipt: result.signalMessage,
+    fromApId: result.fromPartyId,
+    toApId: result.toPartyId,
+    senderId: result.senderId,
+    receiverId: result.receiverId,
+    timestamp: result.timestamp,
+    dryrun: result.dryrun || false,
+  };
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Normalize a participant ID to the format expected by Node42
- */
 function normalizeParticipantId(id) {
-  if (!id) return id;
-  // Node42 expects "iso6523-actorid-upis::9914:SK..."
-  if (!id.includes('::')) {
-    return `iso6523-actorid-upis::${id}`;
+  if (!id?.includes('::')) {
+    return `iso6523-actorid-upis::${id || ''}`;
   }
   return id;
 }
 
-/**
- * Normalize a Node42 validation error to our format
- */
 function normalizeError(e) {
   return {
     rule: e.code || 'unknown',
@@ -281,29 +210,5 @@ function normalizeError(e) {
     location: e.location || '',
     test: e.test || '',
     schematron: e.schematron || '',
-  };
-}
-
-/**
- * Simulated lookup (fallback when Node42 is unavailable)
- */
-function simulatedLookup(participantId) {
-  const [scheme, value] = participantId.includes(':')
-    ? participantId.split(/:(.+)/)
-    : ['9914', participantId];
-
-  return {
-    participantId,
-    smpUrl: `https://smp.simulated.peppol.net`,
-    services: [
-      {
-        document_type:
-          'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1',
-        process_id: 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0',
-        endpoint: `https://ap.simulated.peppol.net/as4`,
-        certificate: '(simulated)',
-      },
-    ],
-    resolved_at: new Date().toISOString(),
   };
 }

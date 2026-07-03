@@ -13,12 +13,10 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import path from 'path';
 import { generateInvoice, generateCreditNote } from './ubl/generator.js';
 import { parseUBL } from './ubl/parser.js';
 import { validateUBL } from './ubl/validator.js';
-import { buildSBDH, parseSBDH, wrapInSBDH } from './as4/sbdh.js';
+import { buildSBDH, parseSBDH } from './as4/sbdh.js';
 import { buildAS4Message, parseAS4Message } from './as4/message.js';
 import * as node42 from './as4/node42.js';
 
@@ -367,35 +365,10 @@ export async function lookupParticipant(participantId) {
     );
   }
 
-  // Try real SMP lookup via Node42 (uses DNS + HTTP)
-  if (node42.isAvailable()) {
-    try {
-      const n42Result = await node42.lookupParticipant(participantId, {
-        env: config.mode,
-      });
-      if (n42Result.services?.[0]?.endpoint) {
-        return n42Result;
-      }
-    } catch {
-      // Fall through to simulated lookup
-    }
-  }
-
-  // Simulated fallback
-  return {
-    participantId,
-    smpUrl: `https://smp.${config.apDomain}`,
-    services: [
-      {
-        document_type:
-          'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1',
-        process_id: DEFAULT_PROCESS_ID,
-        endpoint: `https://ap.${config.apDomain}/as4`,
-        certificate: '(simulated - Node42 not connected to Peppol network)',
-      },
-    ],
-    resolved_at: new Date().toISOString(),
-  };
+  // Use Node42 for real SML→SMP lookup
+  return await node42.lookupParticipant(participantId, {
+    env: config.mode,
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -418,12 +391,12 @@ export async function validateDocument(ublXml, schema = 'peppol') {
   let n42Source = null;
 
   // If custom validator passes, also run Node42's Schematron for extra coverage
-  if (customFatals.length === 0 && node42.isAvailable()) {
+  if (customFatals.length === 0) {
     try {
       const n42Result = await node42.validateWithNode42(ublXml);
-      if (n42Result.source === 'node42-schematron') {
+      if (n42Result.source === 'node42') {
         n42Errors = n42Result.errors || [];
-        n42Source = 'node42-schematron';
+        n42Source = 'node42';
       }
     } catch {
       // Node42 validation failed, rely on custom result
