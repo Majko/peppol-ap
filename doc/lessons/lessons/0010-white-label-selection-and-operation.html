@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 10: White-Label AP Selection &amp; Operation</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #f4f4f5; color: #333; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.85em; line-height: 1.5; border: 1px solid #ddd; }
+  pre .h { color: #2563eb; font-weight: 600; }
+  pre .s { color: #059669; }
+  pre .c { color: #6c7086; font-style: italic; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: #b91c1c; }
+  .diagram { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.2em; margin: 1.2em 0; font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .template-box { background: #fff; border: 2px solid #2563eb; border-radius: 8px; padding: 1.5em; margin: 1.5em 0; }
+  .template-box h3 { margin-top: 0; color: #1e40af; }
+  .template-box .field { background: #eef2ff; padding: 0.1em 0.4em; border-radius: 3px; font-family: "SF Mono", monospace; font-size: 0.85em; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .badge { display: inline-block; background: #1e40af; color: #fff; font-size: 0.65em; padding: 0.15em 0.5em; border-radius: 3px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<h1>🔗 Lesson 10: White-Label AP Selection &amp; Operation</h1>
+<p><em>Provider comparison, legal requirements, communication templates, and operating via a partner AP until your own certification arrives.</em></p>
+
+<hr>
+
+<h2>🎯 This lesson answers</h2>
+<ul>
+  <li>Which providers offer white-label Peppol AP infrastructure and how do they compare?</li>
+  <li>What are the two white-label models (shared cert vs your own cert) and which is right for us?</li>
+  <li>What are the Slovak-specific legal requirements for registering end customers?</li>
+  <li>What is the <code>0245:DIČ</code> participant ID scheme and why does it matter?</li>
+  <li>Are Stormware's per-SME contract requirements legally mandated or their own policy?</li>
+  <li>What exactly should we ask each provider in our requirements email?</li>
+  <li>How do we migrate from the white-label provider to our own AP later?</li>
+</ul>
+
+<hr>
+
+<h2>1. Why a White-Label Bridge?</h2>
+
+<p>While we pursue our own Peppol AP certification (10–14 weeks), we can <strong>immediately offer Peppol connectivity</strong> by reselling a certified provider's infrastructure under our own brand. This is a standard offering from several Peppol infrastructure providers — they handle the certified transport layer, we handle the customer relationship, API, and support.</p>
+
+<div class="callout">
+  <strong>⏱️ Why do this?</strong> Certification takes 10–14 weeks. The white-label bridge lets us:
+  <ul>
+    <li>Start signing up customers <strong>now</strong>, not in October</li>
+    <li>Generate revenue that covers certification costs (~€6,000)</li>
+    <li>Test our API, onboarding, and support processes with real customers</li>
+    <li>Build the customer base before the January 2027 rush</li>
+    <li>Migrate customers seamlessly to our own AP later (same API, same SMP entry)</li>
+  </ul>
+</div>
+
+<h2>2. Slovak Legal Requirements — What the Law Says</h2>
+
+<p>Before evaluating providers, it's critical to understand what the Slovak Peppol Authority (PA SK) <strong>legally requires</strong> for registering end customers. We analysed Stormware Pohoda's conditions and traced each requirement back to the official PA SK documents.</p>
+
+<h3>2.1 The Three Layers of Onboarding</h3>
+
+<p>Based on the Finančná správa SR FAQ and the PA SK accreditation scheme, there are three distinct layers when onboarding an SME:</p>
+
+<table>
+  <tr><th>Layer</th><th>What it means</th><th>Who handles it</th></tr>
+  <tr>
+    <td><strong>Authorization</strong></td>
+    <td>Confirmation that the AP provider has authorization from the tax subject (the SME). The FS app verifies the SME exists as a taxpayer.</td>
+    <td>Finančná správa app + CPDS</td>
+  </tr>
+  <tr>
+    <td><strong>KYC</strong></td>
+    <td>Identity verification — who is the statutory representative, who can approve API keys, who can change providers. <strong>This is entirely the provider's responsibility.</strong></td>
+    <td>CPDS (us) — our choice of process</td>
+  </tr>
+  <tr>
+    <td><strong>SMP registration</strong></td>
+    <td>Technical publishing of the SME's Peppol metadata (participant ID, endpoint, certificate) in the centralised Slovak SMP so they can receive invoices.</td>
+    <td>CPDS in the central Slovak SMP</td>
+  </tr>
+</table>
+
+<h3>2.2 What Is Legally Required (from PA SK / Finančná správa)</h3>
+
+<table>
+  <tr><th>Requirement</th><th>Source</th><th>Binding?</th></tr>
+  <tr>
+    <td><strong>Each SME must have their own Peppol Participant ID</strong> using the scheme <code>0245:DIČ</code> (10-digit tax ID, e.g. <code>0245:1234567890</code>).</td>
+    <td>PASR Point 4: <em>"End User identification scheme — The scheme ID 0245:XXXXXXXXXX must be used when registering Slovakian End Users."</em></td>
+    <td><span class="badge" style="background:#dc2626;">✅ YES — legal requirement</span></td>
+  </tr>
+  <tr>
+    <td><strong>Each SME must be registered in the centralised Slovak SMP.</strong> You cannot register them in a foreign or private SMP.</td>
+    <td>PASR Point 4: <em>"Service Providers must register or ensure that all Slovakian End users are registered on the centralised SMP."</em></td>
+    <td><span class="badge" style="background:#dc2626;">✅ YES — legal requirement</span></td>
+  </tr>
+  <tr>
+    <td><strong>The provider must have PA SK accreditation before offering services to Slovak end users.</strong></td>
+    <td>PASR Point 7.1: <em>"The Service Provider must apply for accreditation [...] before they may offer services to End Users established in Slovakia."</em></td>
+    <td><span class="badge" style="background:#dc2626;">✅ YES — legal requirement</span></td>
+  </tr>
+  <tr>
+    <td><strong>Each SME must have a legal relationship with the provider.</strong> The form of this relationship is not prescribed.</td>
+    <td>Implied by KYC responsibility. The FS FAQ says KYC is the provider's responsibility.</td>
+    <td><span class="badge" style="background:#f59e0b;">✅ Required — but form is flexible</span></td>
+  </tr>
+  <tr>
+    <td><strong>When switching providers, the old provider must deregister the SME from the centralised SMP within 3 working days.</strong></td>
+    <td>PASR Point 5: <em>"When a Slovakian End User decides to switch [...] the existing Service Provider must deregister the End User from the centralised SMP within 3 working days."</em></td>
+    <td><span class="badge" style="background:#dc2626;">✅ YES — legal requirement</span></td>
+  </tr>
+</table>
+
+<h3>2.3 What Is NOT Legally Required (Stormware's Business Policy)</h3>
+
+<p>Stormware Pohoda's published conditions state that for an accounting firm to issue invoices on behalf of a client:</p>
+<ul>
+  <li>A separate contract between Stormware and each SME client is required</li>
+  <li>Each client must have their own Peppol ID and communication tokens tied to their IČO</li>
+  <li>The client must consent to Stormware's T&Cs</li>
+</ul>
+
+<p>We traced each of these against the official PA SK and FS documents. Here's the verdict:</p>
+
+<table>
+  <tr><th>Stormware's condition</th><th>Legal basis?</th><th>Verdict</th></tr>
+  <tr>
+    <td><strong>Separate contract between Stormware and each SME</strong></td>
+    <td>The PASR says provider must have a legal relationship with end users, but does <strong>not</strong> mandate a separate physical contract per SME. Clickwrap T&Cs during self-service onboarding are legally sufficient.</td>
+    <td><span class="badge" style="background:#10b981;">❌ Stormware's choice</span><br>You can use digital clickwrap</td>
+  </tr>
+  <tr>
+    <td><strong>Communication tokens tied to specific IČO</strong></td>
+    <td>No legal requirement for per-SME tokens. The FS FAQ says the provider is responsible for KYC — how you implement it technically is up to you.</td>
+    <td><span class="badge" style="background:#10b981;">❌ Stormware's technical design</span><br>You can use accounting-firm-level tokens with per-SME delegation</td>
+  </tr>
+  <tr>
+    <td><strong>All three conditions must be met before sending</strong></td>
+    <td>PA SK doesn't prescribe implementation details — it says end users must be identifiable and registered in the SMP.</td>
+    <td><span class="badge" style="background:#10b981;">❌ Stormware's risk-averse interpretation</span></td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>🔑 The key distinction:</strong>
+  <pre style="font-size:0.85em; margin:0.5em 0;">
+LEGAL REQUIREMENT (must):
+  Each SME → Peppol ID 0245:DIČ → registered in central SK SMP
+  Each invoice → identifies the actual SME sender/receiver
+
+STORMWARE'S INTERPRETATION (their choice):
+  Each SME → separate paper contract + individual token + consent
+
+YOUR OPTION (also valid):
+  Each SME → Peppol ID 0245:DIČ → registered in central SK SMP
+           → clickwrap T&Cs during self-service onboarding
+           → accounting firm manages via API with per-SME delegation
+           → No separate paper contract needed per SME
+  </pre>
+  <p style="margin:0.3em 0 0 0;">The only non-negotiable: each SME must have their own <code>0245:DIČ</code> participant ID in the centralised Slovak SMP. You cannot batch multiple SMEs under one ID.</p>
+</div>
+
+<h2>3. White-Label Provider Comparison</h2>
+
+<table>
+  <tr><th>Provider</th><th>Product</th><th>Starting price</th><th>What you get</th><th>Slovak CPDS?</th></tr>
+  <tr>
+    <td><strong>Tickstar</strong></td>
+    <td>White-label AP + SMP</td>
+    <td>~€250–€500/mo</td>
+    <td>Your own Peppol cert under their infrastructure. They host the AS4 endpoint + SMP. You get REST API + webhooks. They handle Testbed compliance. You appear as a certified provider in the OpenPeppol directory. Largest provider, hosts ~20% of global APs.</td>
+    <td>Yes — can operate in SK</td>
+  </tr>
+  <tr>
+    <td><strong>ecosio</strong></td>
+    <td>Managed AP</td>
+    <td>~€500–€1,000/mo</td>
+    <td>Full Peppol transport layer. Multi-country support. Strong in EU compliance. Good for cross-border scenarios.</td>
+    <td>Via partner</td>
+  </tr>
+  <tr>
+    <td><strong>PeppolEDGE</strong></td>
+    <td>Gateway / Edge plans</td>
+    <td>~€250–€5,000/mo</td>
+    <td>On-prem or hybrid deployment. Full data sovereignty. Good for organizations that need control. Modular pricing.</td>
+    <td>Via partner</td>
+  </tr>
+  <tr>
+    <td><strong>GoRoute.ai</strong></td>
+    <td>Isolated AP + SMP on AWS</td>
+    <td>~€300–€600/mo</td>
+    <td><strong>Fully isolated infrastructure</strong> — your own AP + SMP on AWS under your brand, your own Peppol cert, your own domain, separate DB per client. Swiss company with strong CEE presence. Migration to your own AP later is trivial.</td>
+    <td>Via partner</td>
+  </tr>
+  <tr>
+    <td><strong>Infinite.pl</strong></td>
+    <td>Certified AP services</td>
+    <td>~€200–€500/mo (negotiable)</td>
+    <td>Polish certified Peppol AP. Direct connectivity, SMP registration. Smaller company = more flexible pricing. Worth asking about white-label options.</td>
+    <td>Check — ask</td>
+  </tr>
+  <tr>
+    <td><strong>Ademico</strong></td>
+    <td>White-label API</td>
+    <td>~€720/yr (Basic) – custom</td>
+    <td>AWS EU-hosted, 99.9% SLA, REST API, webhooks, document validation. Test + production environments.</td>
+    <td>Check</td>
+  </tr>
+  <tr>
+    <td><strong>Peppol.sh</strong></td>
+    <td>API-first AP</td>
+    <td>€0.20/invoice</td>
+    <td>Per-invoice pricing, no monthly minimum. Sandbox free forever. EN 16931 + Peppol BIS 3.0 validation. Good for low-volume start.</td>
+    <td>Check</td>
+  </tr>
+  <tr>
+    <td><strong>e-invoice.be</strong></td>
+    <td>Managed AP (white-label)</td>
+    <td>~€500/mo flat</td>
+    <td>Fixed-price managed AP with white-label option. Unlimited documents. Full OpenPeppol accreditation process handling.</td>
+    <td>Via partner</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>💡 Recommendation:</strong> Contact <strong>3–4 providers</strong> to get comparable proposals:
+  <ol>
+    <li><strong>Tickstar</strong> — safest bet, most established, explicit Slovak CPDS capability.</li>
+    <li><strong>GoRoute.ai</strong> — isolated infrastructure model means easier migration later. Your own cert + domain from day one.</li>
+    <li><strong>Infinite.pl</strong> — Polish provider, potentially lower cost and more flexible. Worth asking about white-label.</li>
+    <li><strong>e-invoice.be</strong> or <strong>Peppol.sh</strong> — as a low-cost comparison baseline.</li>
+  </ol>
+  Send all of them the same structured inquiry (Section 6) and compare apples-to-apples.
+</div>
+
+<h2>4. Understanding the Two White-Label Models</h2>
+
+<table>
+  <tr><th></th><th>Model A: Shared Cert</th><th>Model B: Your Own Cert</th></tr>
+  <tr>
+    <td><strong>How it works</strong></td>
+    <td>You operate under the provider's Peppol cert. Your customers appear under their provider identity in the Peppol network.</td>
+    <td>Provider provisions isolated infrastructure <strong>in your company's name</strong>. The Peppol cert is issued to you. You appear as a certified provider in the OpenPeppol directory.</td>
+  </tr>
+  <tr>
+    <td><strong>OpenPeppol membership needed?</strong></td>
+    <td><span class="badge" style="background:#10b981;">❌ No</span></td>
+    <td><span class="badge" style="background:#dc2626;">✅ Yes</span></td>
+  </tr>
+  <tr>
+    <td><strong>PA SK accreditation needed?</strong></td>
+    <td><span class="badge" style="background:#10b981;">❌ No</span></td>
+    <td><span class="badge" style="background:#dc2626;">✅ Yes</span></td>
+  </tr>
+  <tr>
+    <td><strong>Peppol Testbed needed?</strong></td>
+    <td><span class="badge" style="background:#10b981;">❌ No</span></td>
+    <td><span class="badge" style="background:#dc2626;">✅ Yes</span></td>
+  </tr>
+  <tr>
+    <td><strong>Time to first customer</strong></td>
+    <td><span class="badge" style="background:#10b981;"><strong>2–4 weeks</strong></span></td>
+    <td><span class="badge" style="background:#dc2626;">10–14 weeks</span></td>
+  </tr>
+  <tr>
+    <td><strong>Your name in OpenPeppol directory?</strong></td>
+    <td>Via the provider (not direct)</td>
+    <td><strong>✅ Yes</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Migration to your own AP later?</strong></td>
+    <td>Required — SMP transfer</td>
+    <td>None needed</td>
+  </tr>
+  <tr>
+    <td><strong>Providers using this model</strong></td>
+    <td>Tickstar, ecosio, Peppol.sh, Infinite.pl (likely), Ademico</td>
+    <td>GoRoute.ai, PeppolEDGE (on-prem)</td>
+  </tr>
+  <tr>
+    <td><strong>Best for</strong></td>
+    <td>Speed + early revenue</td>
+    <td>Full ownership from day one</td>
+  </tr>
+</table>
+
+<h3>4.1 The Recommended Strategy: Combine Both</h3>
+
+<p>These are not mutually exclusive. The optimal approach is to <strong>use Model A now</strong> while <strong>pursuing your own cert in parallel</strong>:</p>
+
+<div class="diagram">
+  MONTH 1       MONTH 2       MONTH 3       MONTH 4       MONTH 5
+  │             │             │             │             │
+  ├─Model A (Tickstar)────────────────────────────────────────────
+  │  Sign up    │  Build      │  Go live    │  Onboard    │  Revenue
+  │  contract   │  adapter    │  first      │  customers  │  growing
+  │             │  + test     │  customers  │             │
+  │
+  ├─Certification sprint (your own AP)───────────────────────────
+  │  Submit     │  PA SK eval │  Testbed    │  Sign SPA   │  PRODUCTION
+  │  documents  │  (30 days)  │  execution  │  + cert     │  🚀
+  │             │             │             │  issued     │
+  │
+  ├─Migration window─────────────────────────────────────────────
+  │             │             │             │  Migrate participants
+  │             │             │             │  from Tickstar → your AP
+  │             │             │             │  Decommission Tickstar
+</div>
+
+<div class="callout">
+  <strong>✅ This way you get:</strong>
+  <ol>
+    <li><strong>Speed:</strong> Customers in 2–4 weeks via Tickstar's shared cert. Revenue from Month 2.</li>
+    <li><strong>Ownership:</strong> Your own cert arrives in Month 4–5. No rush — you already have paying customers.</li>
+    <li><strong>Seamless migration:</strong> SMP entries transferred from Tickstar to your SMP. Zero downtime for customers — their Peppol ID stays the same.</li>
+    <li><strong>No GoRoute-style delay:</strong> You don't wait for your own cert before starting.</li>
+  </ol>
+</div>
+
+<h2>5. Selection Criteria — What to Evaluate</h2>
+
+<table>
+  <tr><th>Criterion</th><th>Why it matters</th><th>What to ask</th></tr>
+  <tr>
+    <td><strong>Certificate ownership</strong></td>
+    <td>Do we get our own Peppol cert or operate under theirs?</td>
+    <td>"Will the cert be issued to our company name?"</td>
+  </tr>
+  <tr>
+    <td><strong>SMP ownership</strong></td>
+    <td>Who controls the SMP entry? Can we transfer entries later?</td>
+    <td>"Can participants be registered under our provider ID? Can entries be transferred?"</td>
+  </tr>
+  <tr>
+    <td><strong>0245:DIČ support</strong></td>
+    <td>Slovak law requires this scheme for all end users.</td>
+    <td>"Does your SMP support the `0245:DIČ` participant ID scheme? Is the centralised Slovak SMP supported?"</td>
+  </tr>
+  <tr>
+    <td><strong>Participant registration model</strong></td>
+    <td>Can we register participants via API with per-SME identities? Or does each need a separate contract with you?</td>
+    <td>"Can we register participants via API? Do you require a separate contract per end SME, or can we handle KYC ourselves?"</td>
+  </tr>
+  <tr>
+    <td><strong>API compatibility</strong></td>
+    <td>Must map to our AP Core interface.</td>
+    <td>"REST API? Webhook delivery? Can we send UBL XML via API?"</td>
+  </tr>
+  <tr>
+    <td><strong>Slovak-specific compliance</strong></td>
+    <td>BIS 3.0 SK extension, IS EFA reporting, PA SK accreditation.</td>
+    <td>"Slovak BIS 3.0 SK? IS EFA format? Slovak Peppol Authority compliance?"</td>
+  </tr>
+  <tr>
+    <td><strong>Offboarding process</strong></td>
+    <td>Standard business continuity — how do participants get deregistered if we switch providers?</td>
+    <td>"What is the process and typical lead time for deregistering participants from your SMP? What data export do you provide upon termination?"</td>
+  </tr>
+  <tr>
+    <td><strong>SLA</strong></td>
+    <td>AS4 endpoint uptime, API uptime, support response.</td>
+    <td>"Uptime SLA? Published SLA document? Incident response?"</td>
+  </tr>
+  <tr>
+    <td><strong>Pricing model</strong></td>
+    <td>Per-participant, per-transaction, or flat fee. Limits and overage.</td>
+    <td>"Pricing structure? Caps on participants or transactions? Overage cost?"</td>
+  </tr>
+  <tr>
+    <td><strong>Data residency</strong></td>
+    <td>Must be EU (GDPR). Ideally within EU/EEA.</td>
+    <td>"Infrastructure location? EU-only data residency guarantee?"</td>
+  </tr>
+</table>
+
+<div class="warn">
+  <strong>🤫 Strategic note — what to reveal vs what to keep internal:</strong>
+  <p>Position yourself as an <strong>accounting / software service provider</strong> looking for a reliable Peppol AP partner for your ongoing business. <strong>Do not mention</strong> that you plan to operate your own certified AP in the future — this would give providers no incentive to offer good pricing, invest in onboarding, or support SMP portability.</p>
+  <p>The migration path questions (Section 8) should be framed as <strong>standard business continuity planning</strong> — "what happens if we want to switch providers in the future" — not as "we're building our own AP and leaving." Every professional customer asks about data export and provider switching. It's a normal procurement question.</p>
+  <p>What matters contractually is <strong>short cancellation terms</strong> (monthly or quarterly). If you have a 30-day cancellation clause, you can leave whenever you want regardless of what you said in the introductory email. The contract is what binds you, not the sales pitch.</p>
+</div>
+
+<h2>6. Complete Communication to a White-Label Provider</h2>
+
+<p>Below is the full requirements email to send to each provider. Customise the <span class="field">[bracketed fields]</span> and send the same structured email to each provider for comparable proposals.</p>
+
+<div class="template-box">
+<h3>📧 Email to: White-Label Provider Sales Team</h3>
+<p><strong>Subject:</strong> White-Label Peppol Access Point Inquiry — Slovak Market — <span class="field">[Company name]</span></p>
+
+<pre>
+Dear <span class="field">[Provider name]</span> team,
+
+<span class="field">[Company name]</span> is a Slovak company providing
+accounting and software services to Slovak SMEs. With the
+1 January 2027 B2B e-invoicing mandate approaching, we are
+looking for a reliable Peppol Access Point partner to offer
+Peppol connectivity to our clients under our own brand.
+
+We are building an API-first service platform and need
+a white-label AP solution that we can integrate with and
+operate on an ongoing basis.
+
+Please find our detailed requirements below.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. COMPANY INFORMATION
+
+  Legal name:    <span class="field">[Company name]</span>
+  Country:       Slovak Republic
+  VAT number:    <span class="field">[SK + IČ DPH]</span>
+  Target market: Slovak SMEs (B2B e-invoicing)
+  Est. volume:   Starting ~100–500 invoices/month
+                 growing to 5,000+ within 6 months
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2. TECHNICAL REQUIREMENTS
+
+  2.1 API Access
+  • Send UBL XML invoice → Peppol (return messageId)
+  • Receive incoming documents via webhook
+  • Query delivery status by messageId
+  • Lookup participant by Peppol ID
+  • Register/manage participants in SMP
+
+  2.2 Webhooks
+  • Incoming documents delivered via POST webhook
+  • Status updates via webhook
+  • HMAC signing of payloads
+  • Retry with exponential backoff
+
+  2.3 AS4 Endpoint
+  • Hosted AS4 endpoint under our brand
+  • Multi-region / redundant?
+  • Endpoint URL format?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+3. PARTICIPANT REGISTRATION MODEL
+
+  3.1 Participant Identity
+  • Does each end customer get their own Peppol ID?
+  • Does your SMP support the <span class="field">0245:DIČ</span> scheme
+    (required by Slovak Peppol Authority for all
+    Slovak end users per PASR Point 4)?
+  • Can participants be registered in the centralised
+    Slovak SMP?
+  • Can we register participants under OUR provider
+    identity (so they appear as our customers)?
+
+  3.2 SMP Registration via API
+  • SMP API to create/update/delete participants?
+  • What fields are required per participant?
+    (participantId, endpoint, certificate, doc types,
+    transport profile, process ID)
+  • Propagation time across the Peppol network?
+  • Limits on number of participants?
+
+  3.3 Contractual Model
+  • Do you require a separate contract between your
+    company and each end SME, or can we handle KYC
+    and contracting with our end customers directly?
+  • Can we use clickwrap/digital T&Cs for end SMEs?
+  • Can our accounting firm customers issue invoices
+    on behalf of multiple SMEs under one API account?
+
+  3.4 Certificate Handling
+  • Do we get our own Peppol PKI production cert
+    issued in our company name? Or operate under yours?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+4. SLOVAK-SPECIFIC COMPLIANCE
+
+  • Peppol BIS Billing 3.0 with Slovak extensions?
+  • IS EFA reporting format (5-corner model)?
+  • Certified/accredited for Slovak Peppol Authority?
+  • Experience with Slovak CPDS accreditation?
+  • Centralised Slovak SMP support (PASR Point 4)?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5. PRICING MODEL
+
+  • Per-company, per-transaction, or flat monthly fee?
+  • Starting monthly cost?
+  • Setup/onboarding fees?
+  • Caps on participants or monthly transactions?
+  • Overage cost above plan limits?
+  • Month-to-month or annual commitment?
+  • Reseller/partner discount available?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6. SLA &amp; OPERATIONS
+
+  • AS4 endpoint uptime SLA? (we target 99.9%)
+  • API and SMP uptime SLA?
+  • Published SLA document?
+  • Incident response time for critical outages?
+  • Status page URL?
+  • Maintenance window schedule?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+7. DATA RESIDENCY &amp; SECURITY
+
+  • Infrastructure location? (EU only required)
+  • EU-only data residency guarantee?
+  • ISO 27001 or SOC 2 certification?
+  • Encryption at rest and in transit?
+  • Data retention and deletion policy?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+8. MIGRATION PATH
+
+  8.1 SMP Portability
+  • Can we transfer participant SMP entries to our
+    own SMP later? What is the process?
+  • Expected downtime during migration?
+  • Do you provide migration assistance?
+
+  8.2 Data Export &amp; Offboarding
+  • What is the process and typical lead time for
+    deregistering participants from your SMP?
+  • Can we export our participant list, transaction
+    history, and configuration at any time?
+  • Can we export our participant list, transaction
+    history, and configuration at any time?
+  • In what format?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+9. ADDITIONAL
+
+  • Sandbox/test environment for development?
+  • Developer documentation (API reference, SDKs)?
+  • Typical onboarding timeline from contract to
+    production?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+We are evaluating multiple providers and would appreciate
+a detailed proposal including pricing and technical docs.
+
+Sincerely,
+
+<span class="field">[Your name]</span>
+<span class="field">[Title]</span>
+<span class="field">[Company name]</span>
+</pre>
+</div>
+
+<div class="info">
+  <strong>📋 Before sending:</strong> Review each section and remove or adjust questions you already know from the provider's website. The goal is comparable proposals for an informed decision. Section 3 (Participant Registration) and Section 8 (Migration Path) are the most critical — they determine whether the provider is a fit for the Slovak market and whether you can leave later.
+</div>
+
+<h2>7. Technical Integration — Adapter Layer</h2>
+
+<p>Our AP Core defines a clean interface. To use a white-label provider, build a <strong>thin adapter</strong> that translates between our interface and theirs:</p>
+
+<div class="diagram">
+  ┌──────────────────────────────────────────────────────────────────┐
+  │                    OUR SERVICE PLATFORM                          │
+  │  (API + portal — same whether white-label or our own AP)         │
+  └────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │               AP CORE INTERFACE (unchanged)                      │
+  │                                                                  │
+  │  sendInvoice(ublXml, participantId) → messageId                  │
+  │  lookupParticipant(participantId) → endpoint + cert              │
+  │  receiveWebhook(payload) → void                                  │
+  │  getStatus(messageId) → status                                   │
+  └────────────────────────┬─────────────────────────────────────────┘
+                           │
+                           ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │            ADAPTER LAYER (swappable)                             │
+  │                                                                  │
+  │  ┌─────────────────────┐  ┌──────────────────────────────────┐   │
+  │  │ White-label adapter │  │  Our own AP adapter (future)     │   │
+  │  │                     │  │                                  │   │
+  │  │ Calls Tickstar API  │  │  Calls our own AS4 engine        │   │
+  │  │ Maps responses to   │  │  (Node42) directly               │   │
+  │  │ our internal format │  │                                  │   │
+  │  └──────────┬──────────┘  └──────────────────────────────────┘   │
+  │             │                                                    │
+  └─────────────┼────────────────────────────────────────────────────┘
+                │
+                ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │            WHITE-LABEL PROVIDER (e.g. Tickstar)                  │
+  │                                                                  │
+  │  • Their certified AS4 endpoint                                  │
+  │  • Their SMP with our participants under our provider ID         │
+  │  • Their Peppol certificate (or ours, depending on model)        │
+  │  • Their Testbed compliance + OpenPeppol certification           │
+  └──────────────────────────────────────────────────────────────────┘
+</div>
+
+<p><strong>Key principle:</strong> The Service Platform never knows whether it's talking to a white-label backend or our own AP. When we migrate, we swap the adapter — zero changes to the platform or customer-facing API.</p>
+
+<h2>8. Migration Path — White-Label → Our Own AP</h2>
+
+<ol>
+  <li><strong>Preparation (weeks before migration):</strong> Register all new participants directly in our own SMP from Day 1 of our certification. Existing participants stay on the white-label SMP. Build and test the "our own AP" adapter in staging.</li>
+  <li><strong>Batch migration (single maintenance window):</strong> Schedule a low-traffic window (e.g. Saturday night). For each participant: update SMP entry to point to our AS4 endpoint. This is a DNS+metadata change — the participant's Peppol ID doesn't change. Per PASR, the old provider must deregister within 3 working days.</li>
+  <li><strong>Adapter swap:</strong> Deploy the "our own AP" adapter. The Service Platform continues using the same internal interface — the adapter just routes to Node42 instead of the white-label API. No change for end customers.</li>
+  <li><strong>Decommission white-label:</strong> Once all participants are migrated and verified, cancel the white-label contract. Total migration time: <strong>hours, not weeks.</strong> No need for lengthy coexistence.</li>
+</ol>
+
+<div class="info">
+  <strong>🔑 Negotiate SMP portability upfront:</strong> Ensure the contract allows SMP entries to be transferred to your own SMP without requiring participants to re-register. Most reputable providers support this — confirm in writing. Frame this as: "What is your standard offboarding process for participants?" — a normal question any professional buyer would ask.
+</div>
+
+<h2>9. White-Label Activities — Checklist</h2>
+
+<table>
+  <tr><th style="width:40px">Done</th><th style="width:40px">#</th><th>Item</th><th>Priority</th></tr>
+  <tr><td>☐</td><td>W1</td><td><strong>Identify 4–5 providers to evaluate</strong> — Tickstar, GoRoute.ai, Infinite.pl, ecosio, PeppolEDGE, Peppol.sh</td><td><span class="badge" style="background:#dc2626;">Now</span></td></tr>
+  <tr><td>☐</td><td>W2</td><td><strong>Send structured requirements email</strong> (template in Section 6) to each provider</td><td><span class="badge" style="background:#dc2626;">Now</span></td></tr>
+  <tr><td>☐</td><td>W3</td><td><strong>Compare proposals</strong> — evaluate against the 10 criteria from Section 5. Create comparison table. Select provider.</td><td><span class="badge" style="background:#f59e0b;">Week 2</span></td></tr>
+  <tr><td>☐</td><td>W4</td><td><strong>Negotiate contract</strong> — SMP portability clause, SLA 99.9%+, EU data residency, monthly cancellation, migration assistance. Confirm 0245:DIČ support + no per-SME paper contract requirement.</td><td><span class="badge" style="background:#f59e0b;">Week 2–3</span></td></tr>
+  <tr><td>☐</td><td>W5</td><td><strong>Set up sandbox account</strong> — test API credentials, endpoints, sample data</td><td><span class="badge" style="background:#f59e0b;">Week 3</span></td></tr>
+  <tr><td>☐</td><td>W6</td><td><strong>Build white-label adapter</strong> — map our AP Core interface to provider's API (~200–400 LOC)</td><td><span class="badge" style="background:#f59e0b;">Week 3–4</span></td></tr>
+  <tr><td>☐</td><td>W7</td><td><strong>Test end-to-end</strong> — send invoice via our API → adapter → provider → Peppol → receive back via webhook</td><td><span class="badge" style="background:#f59e0b;">Week 4</span></td></tr>
+  <tr><td>☐</td><td>W8</td><td><strong>Register first test participant in SMP</strong> — using 0245:DIČ scheme in the centralised Slovak SMP</td><td><span class="badge" style="background:#10b981;">Week 4–5</span></td></tr>
+  <tr><td>☐</td><td>W9</td><td><strong>Go live with white-label</strong> — announce service, onboard first paying customers</td><td><span class="badge" style="background:#10b981;">Week 5</span></td></tr>
+  <tr><td>☐</td><td>W10</td><td><strong>Document migration plan</strong> — step-by-step for moving participants to our own AP. Test with test participant.</td><td><span class="badge" style="background:#10b981;">Week 6–8</span></td></tr>
+  <tr><td>☐</td><td>W11</td><td><strong>Execute migration</strong> — when our cert arrives, migrate participants, deploy our adapter, decommission white-label</td><td><span class="badge" style="background:#10b981;">After cert</span></td></tr>
+</table>
+
+<h2>10. White-Label Costs</h2>
+
+<table>
+  <tr><th>Item</th><th>Estimated monthly cost</th><th>Duration</th><th>Total</th></tr>
+  <tr><td>White-label AP subscription</td><td>~€250–€500/mo</td><td>4–6 months (Jul–Nov)</td><td>~€1,000–€3,000</td></tr>
+  <tr><td>Adapter development</td><td>—</td><td>~1 week (one-time)</td><td>~€0 (we build it)</td></tr>
+  <tr><td>Testing + integration</td><td>—</td><td>~1 week (one-time)</td><td>~€0</td></tr>
+  <tr><td><strong>Total white-label bridge cost</strong></td><td></td><td></td><td><strong>~€1,000–€3,000</strong></td></tr>
+</table>
+
+<div class="callout">
+  <strong>💰 Revenue offset:</strong> 20 customers at €29/mo = €580/mo — covering most of the cost. 50 customers (~€1,100/mo) — profitable from month 1. The white-label cost is an investment in time-to-market that pays for itself.
+</div>
+
+<h2>11. Decision Matrix — White-Label vs Wait</h2>
+
+<table>
+  <tr><th>Factor</th><th>White-label bridge</th><th>Wait for own cert</th></tr>
+  <tr><td>Time to first customer</td><td><strong>4–5 weeks</strong></td><td>14–18 weeks</td></tr>
+  <tr><td>Revenue start</td><td><strong>Month 2</strong></td><td>Month 5</td></tr>
+  <tr><td>Market position by Jan 2027</td><td><strong>~50–100 customers</strong></td><td>~0–20 customers</td></tr>
+  <tr><td>Monthly cost</td><td>€250–€500</td><td>€10–€15</td></tr>
+  <tr><td>Technical control</td><td>Limited (provider dependency)</td><td>Full</td></tr>
+  <tr><td>SMP ownership</td><td>Negotiable</td><td>Full</td></tr>
+  <tr><td>Margin per customer</td><td>Lower (provider takes cut)</td><td>Full</td></tr>
+  <tr><td>Migration risk</td><td>Requires careful cut-over</td><td>None</td></tr>
+</table>
+
+<div class="info">
+  <strong>🎯 Verdict:</strong> The white-label bridge is the right call. The cost (~€250–500/mo for 4–6 months) is trivial compared to being in the market 3 months earlier. Every customer onboarded before January 2027 is a customer who doesn't evaluate 37 other providers. Build the adapter, launch on white-label by August, migrate to your own AP by November.
+</div>
+
+<hr>
+
+<h2>✅ You can now</h2>
+<ol>
+  <li>Explain the Slovak legal requirements for end-user registration (0245:DIČ, centralised SMP, KYC responsibility)</li>
+  <li>Distinguish between legally mandated requirements and provider-specific business policies</li>
+  <li>Compare 8 white-label providers across the two models (shared cert vs your own cert)</li>
+  <li>Send the structured requirements email to 3–4 providers using the template in Section 6</li>
+  <li>Evaluate proposals against the 10 selection criteria</li>
+  <li>Build the adapter layer and go live within 4–5 weeks</li>
+  <li>Plan the migration from white-label to your own AP when certified</li>
+</ol>
+
+<h2>📚 References</h2>
+<ul>
+  <li><a href="https://www.financnsprava.sk/_img/pfsedit/Dokumenty_PFS/Podnikatelia/Dan_z_pridanej_hodnoty/efaktura/2026/2026.01.23_Peppol_Authority.pdf">PA SK Specific Requirements (PASR)</a></li>
+  <li><a href="https://cpds.sk/blog/autorizacia-kyc-a-smp-pri-efakturacii/">Autorizácia, KYC a zápis do SMP (CPDS.sk)</a></li>
+  <li><a href="0008-certification-roadmap.html">Lesson 8: Certification Roadmap</a></li>
+  <li><a href="0009-certification-templates-and-checklist.html">Lesson 9: Certification Sprint Templates &amp; Checklist</a></li>
+  <li><a href="https://www.stormware.sk/e-fakturacia/#t2">Stormware Pohoda e-Fakturácia podmienky</a></li>
+  <li><a href="https://www.tickstar.com/">Tickstar</a> | <a href="https://goroute.ai/hosted-infrastructure.html">GoRoute.ai</a> | <a href="https://infinite.pl/global-compliance/infinite-as-peppol-access-point-and-service-provider">Infinite.pl</a></li>
+</ul>
+
+<div class="footer">
+  <p>Lesson 10 of the Peppol Service Provider series. Previous: <a href="0009-certification-templates-and-checklist.html">Lesson 9: Certification Sprint</a> | <a href="0008-certification-roadmap.html">Lesson 8: Certification Roadmap</a></p>
+</div>
+
+</body>
+</html>

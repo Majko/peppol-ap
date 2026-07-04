@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 7: Competitive Analysis, Pricing &amp; Business Case</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.78em; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: #b91c1c; }
+  .diagram { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.2em; margin: 1.2em 0; font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .file { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.85em; background: #eef2ff; padding: 0.1em 0.4em; border-radius: 3px; }
+  .badge { display: inline-block; background: #1e40af; color: #fff; font-size: 0.65em; padding: 0.15em 0.5em; border-radius: 3px; vertical-align: middle; }
+  .badge-green { background: #047857; }
+  .badge-amber { background: #b45309; }
+  .badge-red { background: #dc2626; }
+</style>
+</head>
+<body>
+
+<h1>💰 Lesson 7: Competitive Analysis, Pricing &amp; Business Case</h1>
+<p><em>Who else is in the Slovak Peppol market, what they charge, and whether running your own AP makes financial sense.</em></p>
+
+<hr>
+
+<h2>🎯 This lesson answers</h2>
+<ul>
+  <li>Who are the 38 certified providers in Slovakia and what do they charge?</li>
+  <li>What pricing models work for a pure AP Core (no portal, just transport)?</li>
+  <li>What does OpenPeppol membership actually cost?</li>
+  <li>How much infrastructure costs per phase (from Lesson 6)?</li>
+  <li>What's the break-even point? Is this business viable?</li>
+  <li>What pricing should we set for the Slovak market?</li>
+</ul>
+
+<hr>
+
+<h2>1. The Slovak Market — Context</h2>
+
+<p>From <strong>1 January 2027</strong>, all VAT-registered Slovak businesses must issue and receive structured electronic invoices for domestic B2B transactions via the Peppol network. PDF invoices will no longer be legally valid for in-scope transactions. Slovakia uses a <strong>decentralised 5-corner model</strong> where the tax authority (Finančná správa SR) sits at corner 5, receiving reporting data directly from certified Digital Postmen (CPDS).</p>
+
+<p>This affects roughly <strong>~350,000 VAT-registered entities</strong> in Slovakia. Every one of them needs a certified Digital Postman by 1 Jan 2027.</p>
+
+<p>As of <strong>June 2026</strong>, there are <strong>38 certified providers</strong> on the Finančná správa SR list. These range from:</p>
+<ul>
+  <li>Local Slovak ERP firms adding Peppol as a module (Pohoda, Money S3, KROS)</li>
+  <li>Big-4 advisory firms (Deloitte, KPMG, PwC, EY)</li>
+  <li>Global e-invoicing platforms (Pagero/Thomson Reuters, Basware, Tradeshift, Qvalia)</li>
+  <li>Dedicated digital postmen (ePošťák, Fakturix, Doklado, ESO9, Asseco)</li>
+  <li>White-label infrastructure providers (Tickstar, ecosio)</li>
+</ul>
+
+<div class="callout">
+  <strong>📊 Key stat:</strong> Only <strong>5 out of 38 providers</strong> have fully public pricing in EUR (Asseco, Doklado, Billit, Qvalia, ESO9). Another ~2 have partially available pricing (Flowis, Pagero/Thomson Reuters). The remaining ~31 require you to contact their sales team. This means <strong>transparent pricing is itself a competitive advantage</strong>.
+</div>
+
+<h2>2. Competitor Pricing — Detailed Breakdown</h2>
+
+<h3>2.1 European Market (broader context)</h3>
+
+<table>
+  <tr><th>Volume</th><th>Typical monthly cost</th><th>Provider examples</th></tr>
+  <tr><td>&lt;50 invoices/month</td><td>€15–€30</td><td>Storecove, Peppol Direct</td></tr>
+  <tr><td>50–500/month</td><td>€30–€100</td><td>Storecove, Pagero, Basware</td></tr>
+  <tr><td>500+/month</td><td>€100–€300+</td><td>Pagero, Tradeshift, Bizbrains</td></tr>
+</table>
+
+<p>Per-invoice pricing at scale ranges from <strong>€0.04 to €0.10</strong> (high volume, enterprise). Smaller volumes see <strong>€0.15–€0.50</strong> per invoice.</p>
+
+<h3>2.2 Slovak Market — Publicly Priced Competitors</h3>
+
+<table>
+  <tr><th>Provider</th><th>Plan / Price</th><th>What's included</th><th>Notes</th></tr>
+  <tr>
+    <td><strong>Fakturix</strong> (Thinkio)</td>
+    <td><strong>Free</strong> — €0/mo<br><strong>Starter</strong> — ~€8/mo<br><strong>Pro</strong> — ~€18/mo<br><strong>Business</strong> — ~€45/mo<br><strong>Enterprise API</strong> — custom</td>
+    <td>Free: unlimited inbound, 3 invoices/mo outbound (€0.50/invoice extra)<br>Starter: 20 Peppol outbound/mo incl, €0.15 extra<br>Pro: 100 Peppol outbound/mo incl, €0.10 extra<br>Business: 500 Peppol outbound/mo incl, €0.05 extra</td>
+    <td>Strong freemium model. AI OCR on higher tiers. SAPI-SK API for ViDA CTC 2027.</td>
+  </tr>
+  <tr>
+    <td><strong>ePošťák</strong> (Kaja Solutions)</td>
+    <td><strong>Štandard</strong> — €8/mo<br><strong>Multi-firma</strong> — custom</td>
+    <td>Unlimited Peppol send/receive. Multi-firm dashboard. Enterprise API + SAPI 1.0. Peppol directory + kalkulačka.</td>
+    <td>Built on own AP (no proxy). Strong developer offering. Popular for integrators.</td>
+  </tr>
+  <tr>
+    <td><strong>eFaktúra.sk</strong></td>
+    <td><strong>Free</strong> — €0/mo<br><strong>Pro</strong> — €4.90/mo<br><strong>Ultra</strong> — €15.90/mo<br><strong>Ultra+</strong> — €34.90/mo</td>
+    <td>Free: 1 company, unlimited invoices, 10 recipients<br>Pro: Peppol + 5 GB<br>Ultra: 10 companies + 10 GB<br>Ultra+: 50 companies + 50 GB</td>
+    <td>Newest entrant (May 2026). No public SLA or ISO 27001 yet. Banking add-on €1/account/mo.</td>
+  </tr>
+  <tr>
+    <td><strong>Asseco</strong></td>
+    <td><strong>Basic</strong> — €9.90/mo<br><strong>Business</strong> — €29/mo (200 invoices)<br><strong>Professional</strong> — €69/mo (1,000 invoices)</td>
+    <td>Peppol send/receive, API, Pohoda/Money/Omega integration. Multi-tenant on higher tiers.</td>
+    <td>Well-documented pricing. Split by invoice volume. Trusted brand (large Slovak IT firm).</td>
+  </tr>
+  <tr>
+    <td><strong>Qvalia</strong></td>
+    <td><strong>Plus</strong> — €99/mo (1,000 messages)<br>Over-limit: €0.50/message</td>
+    <td>Peppol routing, validation, multi-tenant, API. SAPI-SK support for Slovak ViDA.</td>
+    <td>Swedish provider, strong in B2B integrations. Higher price point.</td>
+  </tr>
+  <tr>
+    <td><strong>Billit</strong></td>
+    <td>From €7.50/mo</td>
+    <td>Peppol access, basic invoicing, API.</td>
+    <td>Belgian provider expanding to SK market. Lowest entry price.</td>
+  </tr>
+  <tr>
+    <td><strong>Doklado</strong></td>
+    <td>~€9–15/mo (estimated from public info)</td>
+    <td>Document management + Peppol. Targeted at accounting firms.</td>
+    <td>Slovak-developed. Strong in document workflow.</td>
+  </tr>
+  <tr>
+    <td><strong>ESO9</strong></td>
+    <td>~€15–30/mo range</td>
+    <td>ERP-integrated Peppol. Targeted at SMEs using ESO9 ecosystem.</td>
+    <td>Part of larger ERP suite. Not a standalone AP.</td>
+  </tr>
+</table>
+
+<h3>2.3 Pricing Models Observed in the Market</h3>
+
+<table>
+  <tr><th>Model</th><th>Typical range</th><th>Best for</th><th>Used by</th></tr>
+  <tr>
+    <td><strong>Freemium</strong> (free inbound, pay per outbound)</td>
+    <td>€0/mo + €0.10–0.50 per outbound invoice</td>
+    <td>Getting SMEs in the door; they pay when they send</td>
+    <td>Fakturix, ePošťák (partially)</td>
+  </tr>
+  <tr>
+    <td><strong>Flat monthly</strong> (unlimited invoices)</td>
+    <td>€8–€15/mo per company</td>
+    <td>Accounting firms managing multiple clients</td>
+    <td>ePošťák, Billit</td>
+  </tr>
+  <tr>
+    <td><strong>Tiered volume</strong> (per-invoice bucket)</td>
+    <td>€9–€69/mo depending on volume</td>
+    <td>SMEs with predictable invoice counts</td>
+    <td>Asseco, Qvalia</td>
+  </tr>
+  <tr>
+    <td><strong>Enterprise flat</strong> (managed AP, custom)</td>
+    <td>€250–€6,000/mo</td>
+    <td>Large enterprises, white-label operators</td>
+    <td>PeppolEDGE, Tickstar, ecosio</td>
+  </tr>
+  <tr>
+    <td><strong>Per-invoice pure</strong></td>
+    <td>€0.04–€0.20 per invoice</td>
+    <td>API-first, low-touch, high-volume</td>
+    <td>Peppol.sh, Storecove</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>💡 Observation:</strong> The Slovak market is converging on <strong>€8–€10/mo as the entry-level sweet spot</strong> with unlimited inbound and a small per-outbound fee. This is remarkably low compared to Western Europe (€15–€30), reflecting aggressive competition among 38 certified providers fighting for ~350,000 potential customers.
+</div>
+
+<h2>3. OpenPeppol Membership Costs (Your Cost Base)</h2>
+
+<p>To operate a Peppol AP, you must become an OpenPeppol member and pay annual fees. These are based on company size:</p>
+
+<table>
+  <tr><th>Category</th><th>Your size</th><th>Sign-up fee</th><th>Annual fee (candidate)</th><th>Annual fee (certified)</th></tr>
+  <tr>
+    <td>AP only, S1</td>
+    <td>1–10 employees</td>
+    <td><strong>€1,025</strong></td>
+    <td><strong>€1,800</strong></td>
+    <td><strong>€2,800</strong></td>
+  </tr>
+  <tr>
+    <td>AP only, S2</td>
+    <td>11–50 employees</td>
+    <td><strong>€1,025</strong></td>
+    <td><strong>€1,800</strong></td>
+    <td><strong>€2,800</strong></td>
+  </tr>
+  <tr>
+    <td>AP only, S3</td>
+    <td>51–250 employees</td>
+    <td><strong>€2,100</strong></td>
+    <td><strong>€2,900</strong></td>
+    <td><strong>€3,900</strong></td>
+  </tr>
+  <tr>
+    <td>AP + SMP, S1</td>
+    <td>1–10 employees</td>
+    <td><strong>€1,750</strong></td>
+    <td><strong>€2,650</strong></td>
+    <td><strong>€4,150</strong></td>
+  </tr>
+</table>
+
+<p><strong>Additional one-time costs:</strong></p>
+<ul>
+  <li><strong>Certification fee</strong> (upon first certification): <strong>€2,500</strong> (for AP + SMP, billed once, then added to annual fee thereafter)</li>
+  <li><strong>Peppol PKI certificate</strong>: issued by OpenPeppol CA — free for members (included in membership)</li>
+</ul>
+
+<p><strong>Total first-year cost (AP only, S1 size):</strong> €1,025 (sign-up) + €1,800 (candidate annual) + €2,500 (certification) = <strong>€5,325</strong></p>
+<p><strong>Ongoing annual cost (certified, AP only):</strong> <strong>€2,800</strong></p>
+
+<div class="callout">
+  <strong>⚠️ Important:</strong> The Slovak Peppol Authority (Finančná správa SR) may impose <strong>additional national fees</strong> or requirements beyond OpenPeppol. The accreditation procedure PDF mentions specific Slovak requirements — factor in ~€500–1,000 for Slovak-specific legal/admin costs in year one.
+</div>
+
+<h2>4. Infrastructure Costs by Phase (from Lesson 6)</h2>
+
+<table>
+  <tr><th>Phase</th><th>Architecture</th><th>Regions</th><th>Monthly infra cost</th><th>Annual infra cost</th></tr>
+  <tr>
+    <td><strong>1. Prototype</strong></td>
+    <td>Single VPS, everything together</td>
+    <td>1 (Hetzner FSN1)</td>
+    <td>~€10–15/mo</td>
+    <td><strong>~€120–180/yr</strong></td>
+  </tr>
+  <tr>
+    <td><strong>2. MVP</strong></td>
+    <td>Single region, 2 VMs + LB</td>
+    <td>1 region (Hetzner FSN1 + NBG1)</td>
+    <td>~€40–80/mo</td>
+    <td><strong>~€480–960/yr</strong></td>
+  </tr>
+  <tr>
+    <td><strong>3. Production</strong></td>
+    <td>Active-active, 2 EU regions</td>
+    <td>Frankfurt + Warsaw</td>
+    <td>~€400–700/mo</td>
+    <td><strong>~€4,800–8,400/yr</strong></td>
+  </tr>
+  <tr>
+    <td><strong>4. Scale</strong></td>
+    <td>3+ EU regions, full HA</td>
+    <td>Frankfurt + Warsaw + Stockholm</td>
+    <td>~€1,000–2,000/mo</td>
+    <td><strong>~€12,000–24,000/yr</strong></td>
+  </tr>
+</table>
+
+<h2>5. Full Cost Model (Year 1 — MVP Phase)</h2>
+
+<p>Assuming Phase 2 (MVP, single region, 2 VMs) for the first year of operation, targeting 200 SMEs:</p>
+
+<table>
+  <tr><th>Category</th><th>Item</th><th>Cost (Year 1)</th></tr>
+  <tr style="background:#eef2ff"><td colspan="3"><strong>One-time costs</strong></td></tr>
+  <tr><td></td><td>OpenPeppol sign-up fee (AP only, S1)</td><td>€1,025</td></tr>
+  <tr><td></td><td>OpenPeppol certification fee</td><td>€2,500</td></tr>
+  <tr><td></td><td>Slovak authority accreditation</td><td>~€500</td></tr>
+  <tr><td></td><td>Company registration + legal (Slovakia s.r.o.)</td><td>~€500</td></tr>
+  <tr><td></td><td><strong>Total one-time</strong></td><td><strong>€4,525</strong></td></tr>
+  <tr style="background:#eef2ff"><td colspan="3"><strong>Recurring annual costs</strong></td></tr>
+  <tr><td></td><td>OpenPeppol annual fee (candidate → certified)</td><td>€1,800 → €2,800</td></tr>
+  <tr><td></td><td>Infrastructure (MVP: 2 VMs + LB)</td><td>€480–960</td></tr>
+  <tr><td></td><td>Domain + DNS (ap.mojafaktura.sk + monitoring)</td><td>~€50</td></tr>
+  <tr><td></td><td>SMP/SML registration (Peppol DNS records)</td><td>Included</td></tr>
+  <tr><td></td><td><strong>Total recurring</strong></td><td><strong>€2,330–€3,810/yr</strong></td></tr>
+  <tr style="background:#eef2ff"><td colspan="3"><strong>Total Year 1</strong></td></tr>
+  <tr><td></td><td><strong>One-time + recurring</strong></td><td><strong>~€6,855–€8,335</strong></td></tr>
+  <tr><td></td><td><em>Rounded for planning</em></td><td><strong>~€7,500</strong></td></tr>
+</table>
+
+<p><strong>Year 2+ ongoing costs:</strong> ~€2,800 (OpenPeppol) + €480–960 (infra) + €50 (domain) = <strong>~€3,350–€3,810/yr</strong></p>
+
+<div class="info">
+  <strong>📉 The key insight:</strong> Once accredited, the marginal cost of operation is very low. The heavy costs are upfront (legal, accreditation, certification). If you're already a Slovak resident with an existing company, the one-time costs drop by ~€1,000.
+</div>
+
+<h2>6. Revenue Model — Proposed Pricing</h2>
+
+<h3>Our positioning: Pure AP Core as a Service</h3>
+
+<p>Unlike the competitors above, we're not building a full invoicing portal with AI OCR, bank integrations, and inventory management. We're building a <strong>pure, high-performance Peppol transport layer</strong> — the certified AS4 engine — exposed via REST API and webhooks. Our customers are:</p>
+<ul>
+  <li><strong>Accounting firms</strong> that already have their own invoicing software and just need Peppol connectivity</li>
+  <li><strong>ERP vendors</strong> (Pohoda, Money S3, KROS, Omega integrators) who need a white-label Peppol backend</li>
+  <li><strong>Software developers</strong> building multi-tenant platforms who want to embed Peppol without certification themselves</li>
+  <li><strong>Mid-sized SMEs</strong> with existing accounting setups who don't want to switch to a full invoicing platform</li>
+</ul>
+
+<h3>Proposed pricing tiers</h3>
+
+<table>
+  <tr><th>Tier</th><th>Target</th><th>Price</th><th>What's included</th></tr>
+  <tr>
+    <td><strong>API Developer</strong></td>
+    <td>Developers testing integration</td>
+    <td><strong>€0/mo</strong> (sandbox)</td>
+    <td>Sandbox environment, test participants, API docs, 50 test invoices/mo</td>
+  </tr>
+  <tr>
+    <td><strong>Starter</strong></td>
+    <td>Sole traders, micro-businesses</td>
+    <td><strong>€9/mo</strong></td>
+    <td>1 company, unlimited inbound, 20 outbound/mo included, €0.15/invoice extra, email support</td>
+  </tr>
+  <tr>
+    <td><strong>Business</strong></td>
+    <td>SMEs, accounting firms</td>
+    <td><strong>€29/mo</strong></td>
+    <td>1 company, unlimited inbound, 200 outbound/mo included, €0.10/invoice extra, API + webhooks, priority email support</td>
+  </tr>
+  <tr>
+    <td><strong>Professional</strong></td>
+    <td>Medium businesses, integrators</td>
+    <td><strong>€79/mo</strong></td>
+    <td>5 companies, unlimited inbound, 1,000 outbound/mo included, €0.05/invoice extra, full API, webhooks, SLA 99.9%, phone support</td>
+  </tr>
+  <tr>
+    <td><strong>White-Label</strong></td>
+    <td>ERP vendors, platforms</td>
+    <td><strong>€249–€999/mo</strong></td>
+    <td>Unlimited companies, unlimited inbound, volume-based outbound pricing, dedicated SMP, custom branding, SLA 99.99%, dedicated support, DPA</td>
+  </tr>
+</table>
+
+<h3>Justification vs competitors</h3>
+
+<table>
+  <tr><th>Factor</th><th>Our pricing</th><th>Why</th></tr>
+  <tr>
+    <td>Starter at €9/mo</td>
+    <td>Matches ePošťák (€8) and Asseco Basic (€9.90)</td>
+    <td>Market rate for entry-level. No race to the bottom — €8–10 is the established floor.</td>
+  </tr>
+  <tr>
+    <td>Per-outbound pricing</td>
+    <td>€0.15/€0.10/€0.05 per tier</td>
+    <td>Aligned with Fakturix (€0.10–0.50) and European norms (€0.04–0.10 at scale). High-volume customers get better rates.</td>
+  </tr>
+  <tr>
+    <td>Unlimited inbound</td>
+    <td>Free on all tiers</td>
+    <td>Industry standard (Fakturix, ePošťák). Inbound is cheap for us (one AS4 receive + webhook).</td>
+  </tr>
+  <tr>
+    <td>White-Label at €249+</td>
+    <td>Below PeppolEDGE (€250–€5,000) but above simple reselling</td>
+    <td>Targeting Pohoda/Money/Omega integrators who want Peppol under their own brand. They'll pay a premium for not needing their own certification.</td>
+  </tr>
+</table>
+
+<h2>7. Revenue Projections at Various Adoption Levels</h2>
+
+<table>
+  <tr><th>Adoption</th><th>Mix assumption</th><th>Monthly revenue</th><th>Annual revenue</th></tr>
+  <tr>
+    <td><strong>50 SMEs</strong> (Month 1–3)</td>
+    <td>30 Starter + 15 Business + 5 Professional</td>
+    <td>30×€9 + 15×€29 + 5×€79 = <strong>€1,100/mo</strong></td>
+    <td><strong>~€13,200</strong></td>
+  </tr>
+  <tr>
+    <td><strong>200 SMEs</strong> (Month 4–8)</td>
+    <td>100 Starter + 70 Business + 25 Professional + 5 White-Label</td>
+    <td>100×€9 + 70×€29 + 25×€79 + 5×€499 = <strong>~€6,020/mo</strong></td>
+    <td><strong>~€72,240</strong></td>
+  </tr>
+  <tr>
+    <td><strong>750 SMEs</strong> (Month 9–12)</td>
+    <td>350 Starter + 250 Business + 100 Professional + 50 White-Label</td>
+    <td>350×€9 + 250×€29 + 100×€79 + 50×€399 = <strong>~€42,550/mo</strong></td>
+    <td><strong>~€510,600</strong></td>
+  </tr>
+  <tr>
+    <td><strong>2,000 SMEs</strong> (Year 2–3)</td>
+    <td>800 Starter + 700 Business + 300 Professional + 200 White-Label</td>
+    <td>800×€9 + 700×€29 + 300×€79 + 200×€299 = <strong>~€120,100/mo</strong></td>
+    <td><strong>~€1,441,200</strong></td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>📈 Realism check:</strong> 2,000 SMEs in Year 2–3 represents ~0.6% of the total Slovak VAT-registered market (350,000). That's attainable if we differentiate on API quality, white-label capability, and developer experience. At 750 SMEs (Year 1 target), revenue of ~€42,550/mo against costs of ~€7,500/yr gives a healthy margin — <strong>but only if we keep the team lean (1–2 people)</strong>.
+</div>
+
+<h2>8. Break-Even Analysis</h2>
+
+<table>
+  <tr><th>Scenario</th><th>Year 1 costs</th><th>Year 1 revenue</th><th>Year 1 result</th><th>Break-even month</th></tr>
+  <tr>
+    <td><strong>Conservative</strong> (50 SMEs by month 6)</td>
+    <td>€8,000</td>
+    <td>~€4,000 (ramp-up)</td>
+    <td><strong>−€4,000</strong></td>
+    <td>Month 8–9</td>
+  </tr>
+  <tr>
+    <td><strong>Moderate</strong> (200 SMEs by month 8)</td>
+    <td>€8,000</td>
+    <td>~€20,000 (ramp-up)</td>
+    <td><strong>+€12,000</strong></td>
+    <td>Month 5–6</td>
+  </tr>
+  <tr>
+    <td><strong>Aggressive</strong> (500 SMEs by month 8)</td>
+    <td>€10,000</td>
+    <td>~€75,000 (ramp-up)</td>
+    <td><strong>+€65,000</strong></td>
+    <td>Month 3–4</td>
+  </tr>
+</table>
+
+<div class="warn">
+  <strong>⚠️ Critical dependency:</strong> This analysis assumes <strong>no full-time employees</strong> beyond the founder. If you need to hire (even one developer or support person at ~€2,000/mo), the break-even shifts dramatically:
+  <ul>
+    <li>With 1 hire: break-even at ~130 SMEs (~€3,900/mo revenue)</li>
+    <li>With 2 hires: break-even at ~250 SMEs (~€7,500/mo revenue)</li>
+  </ul>
+  <p style="margin:0.5em 0 0 0">Keep the operation lean until revenue justifies headcount. The AP Core is designed to be low-touch — automate as much as possible.</p>
+</div>
+
+<h2>9. Competitive Differentiation Strategy</h2>
+
+<p>With 38 certified providers, you can't win on price alone (€8/mo floor is already set). Here's how we differentiate:</p>
+
+<table>
+  <tr><th>Dimension</th><th>Current competitors</th><th>Our advantage</th></tr>
+  <tr>
+    <td><strong>API quality</strong></td>
+    <td>Most competitors bundle Peppol with a full invoicing UI. Their APIs are secondary.</td>
+    <td><strong>API-first by design.</strong> Our entire product is a REST API. Webhooks, webhook HMAC signing, idempotency, deterministic error codes. Developer experience is the product.</td>
+  </tr>
+  <tr>
+    <td><strong>White-label</strong></td>
+    <td>Only PeppolEDGE and Tickstar offer true white-label. They're expensive (€250+).</td>
+    <td><strong>White-label from day one.</strong> ERP integrators (Pohoda, Money, Omega) resell under their brand. No UI from us — just the API and SMP registration.</td>
+  </tr>
+  <tr>
+    <td><strong>Latency + reliability</strong></td>
+    <td>Many competitors run single-server, single-region setups.</td>
+    <td><strong>Active-active multi-region</strong> (from Phase 3). Better SLA than most Slovak competitors who are on single Hetzner boxes.</td>
+  </tr>
+  <tr>
+    <td><strong>Transparent pricing</strong></td>
+    <td>31 of 38 providers hide their pricing behind sales calls.</td>
+    <td><strong>Full public pricing</strong> on the website. No "contact sales" gate. Credit card sign-up, self-service activation.</td>
+  </tr>
+  <tr>
+    <td><strong>SMP ownership</strong></td>
+    <td>Most providers use a shared SMP or don't offer SMP services.</td>
+    <td><strong>We run our own SMP.</strong> If a customer wants their own SMP entry under their own brand, we provide it (White-Label tier).</td>
+  </tr>
+  <tr>
+    <td><strong>Open source core</strong></td>
+    <td>Most competitors use closed-source stacks (Oxalis-NG is open but Java).</td>
+    <td><strong>Node.js + open-source AS4.</strong> Customers can inspect the transport layer. No Java dependency. Easy to extend.</td>
+  </tr>
+</table>
+
+<h2>10. Risks &amp; Mitigations</h2>
+
+<table>
+  <tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr>
+  <tr>
+    <td><strong>Price war:</strong> 38 providers competing on price drives margins to zero</td>
+    <td>High</td>
+    <td>Don't compete on price — compete on API quality, white-label, and developer experience. The €8/mo floor is already set; we match it at Starter tier and upsell on value.</td>
+  </tr>
+  <tr>
+    <td><strong>Slow adoption:</strong> SMEs wait until the last minute (Dec 2026) to sign up</td>
+    <td>Medium</td>
+    <td>Launch sandbox early (Q3 2026). Target accounting firms and ERP integrators first — they'll need to test before the mandate. SMEs will follow their software vendors.</td>
+  </tr>
+  <tr>
+    <td><strong>Regulatory change:</strong> Slovak government changes requirements</td>
+    <td>Low</td>
+    <td>Already baked into law (385/2025 Z.z.). ViDA directive is EU-level. Changes are unlikely within 2 years. Monitor Peppol Authority communications.</td>
+  </tr>
+  <tr>
+    <td><strong>Technical failure:</strong> Outage during month-end invoicing spike</td>
+    <td>Medium</td>
+    <td>Active-active architecture (Phase 3). Protocol retries give 2-hour buffer. Transparent post-mortems build trust.</td>
+  </tr>
+  <tr>
+    <td><strong>ERP vendor lock-out:</strong> Pohoda/Money/Omega build their own AP instead of white-labelling</td>
+    <td>Medium</td>
+    <td>They might, but it'd take them 6–12 months to certify. Our white-label tier lets them go to market in weeks. Be cheaper than their build-vs-buy threshold.</td>
+  </tr>
+  <tr>
+    <td><strong>Cancellation risk:</strong> Customer churn after mandate rush (2027 H2)</td>
+    <td>Medium</td>
+    <td>Multi-year contracts for White-Label tier. Annual billing discount (2 months free) for Business/Professional tiers. Lock-in through SMP registration (changing AP requires re-registration).</td>
+  </tr>
+</table>
+
+<h2>11. Strategic Recommendations</h2>
+
+<ol>
+  <li><strong>Start with the API Developer (free) tier immediately.</strong> Get developers and integrators testing in the sandbox. They'll become your sales channel.</li>
+  <li><strong>Target accounting firms, not end-SMEs, in Month 1–6.</strong> One accounting firm managing 50 clients = 50 companies on your platform. Far cheaper to acquire than 50 individual SMEs.</li>
+  <li><strong>Publish pricing on Day 1.</strong> Being one of the few providers with transparent public pricing is a genuine differentiator. It builds trust and reduces sales friction.</li>
+  <li><strong>Run MVP infrastructure (Phase 2) for at least the first 6 months post-launch.</strong> Don't jump to active-active (Phase 3) until you have 200+ paying companies. The cost difference is 10×.</li>
+  <li><strong>Budget ~€8,000 for Year 1 all-in</strong> (accreditation + infrastructure + legal). Revenue from 100+ SMEs covers this. After that, it's pure margin.</li>
+  <li><strong>Don't build a UI.</strong> The competitive advantage is API + white-label. Every euro spent on a customer portal is a euro not spent on API quality, docs, or SMP reliability. Let your partners build the UI.</li>
+  <li><strong>Monitor the 31 "price hidden" competitors.</strong> If any of them publish pricing below €8/mo, we may need to adjust. But for now, the market floor is stable.</li>
+</ol>
+
+<h2>12. Summary</h2>
+
+<table>
+  <tr><th>Question</th><th>Answer</th></tr>
+  <tr>
+    <td>How many competitors in Slovakia?</td>
+    <td>38 certified providers as of June 2026. Only ~5 have public pricing.</td>
+  </tr>
+  <tr>
+    <td>What's the market price?</td>
+    <td>Entry-level: €8–€10/mo. Per-invoice extra: €0.05–€0.50. Enterprise: €250–€6,000/mo.</td>
+  </tr>
+  <tr>
+    <td>What does OpenPeppol cost?</td>
+    <td>~€5,325 first year (AP only, S1), then ~€2,800/yr ongoing.</td>
+  </tr>
+  <tr>
+    <td>What does infra cost?</td>
+    <td>€10–15/mo (prototype) → €400–700/mo (2-region HA).</td>
+  </tr>
+  <tr>
+    <td>Year 1 all-in cost?</td>
+    <td>~€7,500 (accreditation + MVP infra + legal).</td>
+  </tr>
+  <tr>
+    <td>Break-even?</td>
+    <td>~50–100 SMEs (€1,100–€2,700/mo revenue). Reachable within 6 months with focused effort.</td>
+  </tr>
+  <tr>
+    <td>Is this viable?</td>
+    <td><strong>Yes.</strong> Low marginal cost + 350,000-company market + API-first differentiation = strong unit economics. Keep it lean, focus on integrators, and the numbers work.</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>🎯 Bottom line:</strong> The Slovak Peppol market is crowded (38 providers) but opaque (only 5 publish prices). There's a clear gap for a <strong>transparently-priced, API-first, white-label-capable pure AP</strong> targeting accounting firms and ERP integrators rather than end-SMEs. The unit economics work: at 200 companies (~€6,000/mo revenue) you've already covered all costs including a modest salary. At 750 companies, it's a proper business. The key risk is not competition — it's failing to aggressively court the ERP/accounting-firm channel before the mandate hits on 1 Jan 2027.
+</div>
+
+<hr>
+
+<h2>✅ You can now explain</h2>
+<ol>
+  <li>The Slovak Peppol market landscape: 38 providers, their pricing, and their business models</li>
+  <li>Why transparent pricing is a competitive advantage (31 of 38 hide their prices)</li>
+  <li>OpenPeppol membership costs: ~€5,300 first year, ~€2,800/yr ongoing for a small AP-only provider</li>
+  <li>Infrastructure costs by phase: from €10/mo (prototype) to €700/mo (production HA)</li>
+  <li>Our proposed pricing: €9–€999/mo across 5 tiers (Developer, Starter, Business, Professional, White-Label)</li>
+  <li>The revenue projections at various adoption levels: from €1,100/mo (50 SMEs) to €120,000/mo (2,000 SMEs)</li>
+  <li>Break-even point: ~50–100 SMEs, reachable within 6 months</li>
+  <li>The differentiation strategy: API-first, white-label, transparent pricing, multi-region reliability</li>
+  <li>The strategic importance of targeting accounting firms and ERP integrators over end-SMEs</li>
+</ol>
+
+<h2>📚 References</h2>
+<ul>
+  <li><a href="https://peppol.org/join/fees-2025/">OpenPeppol Membership Fees 2025</a></li>
+  <li><a href="https://epostak.sk/porovnanie-digitalnych-postarov">ePošťák — Comparison of Digital Mailbox Providers</a></li>
+  <li><a href="https://fakturix.sk/en">Fakturix — Slovak PEPPOL Access Point</a></li>
+  <li><a href="https://www.eu-einvoicing.com/news/peppol-access-point-what-it-is-smb-europe-2026">EU E-Invoicing Hub — SME Pricing Guide</a></li>
+  <li><a href="https://www.invoicenavigator.eu/answers/choose-e-invoicing-access-point">Invoice Navigator — AP Selection Criteria</a></li>
+  <li><a href="https://e-invoice.be/blog/best-peppol-access-points">Best Peppol Access Points 2026 — 8 Providers Compared</a></li>
+  <li><a href="0006-infrastructure-redundancy-and-operations.html">Lesson 6: Infrastructure Redundancy &amp; Operations</a></li>
+  <li><a href="../prd/0001-infrastructure-and-persistence.md">PRD 0001: AP Core Infrastructure &amp; Persistence</a></li>
+</ul>
+
+<h2>🤔 Questions?</h2>
+<p>The most important strategic decision is <strong>who to sell to first</strong>. My bet is on accounting firms and ERP integrators — they're the distribution channel to 350,000 SMEs. The alternative is direct-to-SME marketing (ads, SEO, comparison sites). Which direction resonates with you?</p>
+
+<div class="footer">
+  <p>Lesson 7 of the Peppol Service Provider series. See also: <a href="0006-infrastructure-redundancy-and-operations.html">Lesson 6: Infrastructure &amp; Operations</a> | <a href="../prd/0001-infrastructure-and-persistence.md">PRD 0001: Infrastructure &amp; Persistence</a></p>
+</div>
+
+</body>
+</html>

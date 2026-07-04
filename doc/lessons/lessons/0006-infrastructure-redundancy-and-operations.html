@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 6: Infrastructure Redundancy &amp; Operations for a Peppol AP</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.78em; line-height: 1.45; }
+  pre .tag { color: #89b4fa; }
+  pre .attr { color: #a6e3a1; }
+  pre .val { color: #f9e2af; }
+  pre .cm { color: #6c7086; font-style: italic; }
+  pre .k { color: #cba6f7; }
+  pre .e { color: #f38ba8; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: #b91c1c; }
+  .diagram { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.2em; margin: 1.2em 0; font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .file { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.85em; background: #eef2ff; padding: 0.1em 0.4em; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<h1>🔄 Lesson 6: Infrastructure Redundancy &amp; Operations for a Peppol AP</h1>
+<p><em>High-availability requirements, industry practice, capacity planning, and recommended hardware configuration.</em></p>
+
+<hr>
+
+<h2>🎯 This lesson answers</h2>
+<ul>
+  <li>Is high availability <em>required</em> by Peppol, or just nice to have?</li>
+  <li>How do real commercial APs operate their infrastructure?</li>
+  <li>What does a pure AP Core actually need a database for?</li>
+  <li>What's the right architecture for a production AP (active-active vs active-passive)?</li>
+  <li>What hardware do you need for what scale?</li>
+</ul>
+
+<hr>
+
+<h2>1. What the Peppol TIA Formally Requires</h2>
+
+<p>The <strong>Transport Infrastructure Agreement (TIA) Annex 3</strong> sets the minimum SLA for all Peppol APs worldwide. These are the contractual minimums — you <em>must</em> meet them to stay accredited:</p>
+
+<table>
+  <tr><th>Metric</th><th>Requirement</th><th>What it means in practice</th></tr>
+  <tr>
+    <td>Business hours (Mon–Fri 9:00–16:00 CET)</td>
+    <td><strong>≥ 98.5%</strong> available</td>
+    <td>~10.9 hours of downtime allowed per month</td>
+  </tr>
+  <tr>
+    <td>Outside business hours</td>
+    <td><strong>≥ 94.0%</strong> available</td>
+    <td>~43.2 hours allowed per month</td>
+  </tr>
+  <tr>
+    <td>Unavailability definition</td>
+    <td>Not reachable for <strong>≥ 60 continuous seconds</strong></td>
+    <td>Short blips under 60 s don't count as downtime</td>
+  </tr>
+  <tr>
+    <td>Retry policy</td>
+    <td>Sending AP: <strong>≥ 3 retries within 2 hours</strong></td>
+    <td>Built-in protocol resilience gives you a 2-hour window</td>
+  </tr>
+  <tr>
+    <td>Data loss limit</td>
+    <td>Max <strong>24 hours</strong> of data loss</td>
+    <td>After a disaster, you can lose up to a day of message metadata</td>
+  </tr>
+  <tr>
+    <td>Major incident notification</td>
+    <td>Within <strong>4 hours</strong> to Peppol Authority</td>
+    <td>Security breaches and extended outages</td>
+  </tr>
+  <tr>
+    <td>Service windows</td>
+    <td>Max <strong>2 hours</strong>, outside business hours, <strong>3 days</strong> notice</td>
+    <td>Planned maintenance is accounted for</td>
+  </tr>
+  <tr>
+    <td>Capacity planning</td>
+    <td><strong>Documented</strong> process required</td>
+    <td>Must show you track load and scale accordingly</td>
+  </tr>
+</table>
+
+<p>Some Peppol Authorities impose <strong>stricter requirements</strong>. For example, the Norwegian financial sector requires <strong>99.5% availability 24/7</strong> — that's a much tighter bar (~3.6 hours/month total downtime).</p>
+
+<div class="info">
+  <strong>💡 Key insight:</strong> The TIA minimum is surprisingly low. A single server with a documented backup/DR plan technically meets it. But <strong>commercial reality is different</strong> — customers expect much better, and your reputation (and accreditation renewal) depends on it.
+</div>
+
+<h2>2. What the Peppol Protocol Gives You (The Retry Safety Net)</h2>
+
+<p>The Peppol AS4 protocol itself provides significant operational slack, which directly affects your redundancy decisions:</p>
+
+<ul>
+  <li><strong>Mandatory retries:</strong> The sending AP <em>must</em> retry delivery ≥3 times within 2 hours. If your AP goes down for 30 minutes, messages won't be lost — they'll queue at the sender.</li>
+  <li><strong>Synchronous Receipt:</strong> AS4 is not fire-and-forget. The receiver must send back a signed <code>&lt;Receipt&gt;</code> signal. Until that receipt is received and verified, the sender considers the message undelivered and will retry.</li>
+  <li><strong>Message-level idempotency:</strong> Every message has a unique <code>eb:MessageId</code>. If a receipt is lost and the sender retries, the receiver detects the duplicate and re-acknowledges without re-processing.</li>
+  <li><strong>No real-time requirement:</strong> Peppol does not mandate real-time or near-real-time delivery. A message delivered within minutes (or even hours) is compliant.</li>
+</ul>
+
+<div class="callout">
+  <strong>⏱️ What this means for uptime:</strong> Brief outages (&lt;2 hours) are absorbed by the protocol retry mechanism. Messages buffer at the sender. No data is lost. This is fundamentally different from a real-time API where every second of downtime means failed requests.
+</div>
+
+<h2>3. How Commercial APs Actually Operate</h2>
+
+<p>In practice, serious providers go <em>well beyond</em> the TIA minimum. Here's the market reality:</p>
+
+<table>
+  <tr><th>Provider</th><th>Infrastructure Approach</th><th>Published SLA</th></tr>
+  <tr>
+    <td><strong>Basware</strong></td>
+    <td>AWS-hosted, SOC2-audited. Documented Business Continuity Process covering disaster scenarios and recovery plans.</td>
+    <td>N/A (enterprise)</td>
+  </tr>
+  <tr>
+    <td><strong>Tietoevry</strong></td>
+    <td>Built dedicated disaster recovery integration framework. Multi-region capable.</td>
+    <td>N/A (enterprise)</td>
+  </tr>
+  <tr>
+    <td><strong>Ecosio / Tickstar</strong></td>
+    <td>"Complying well above OpenPeppol SLA". Multi-region, redundant infrastructure, white-label SMP.</td>
+    <td>N/A</td>
+  </tr>
+  <tr>
+    <td><strong>Ademico</strong></td>
+    <td>AWS EU-hosted, redundant infrastructure.</td>
+    <td><strong>99.9%</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Dokapi</strong></td>
+    <td>ISO 27001 certified, OAuth 2.0, encrypted data transfer.</td>
+    <td><strong>99.9%</strong></td>
+  </tr>
+  <tr>
+    <td><strong>E-Invoice.be</strong></td>
+    <td>"Redundant infrastructure ensures your e-invoicing never stops."</td>
+    <td><strong>99.9%</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Recommand</strong></td>
+    <td>SLA defines 15 consecutive minutes as unavailability (much tighter than Peppol's 60 s).</td>
+    <td><strong>99.9%</strong></td>
+  </tr>
+  <tr>
+    <td><strong>InvoStaq</strong></td>
+    <td>Starter tier at 99.5%, Pro tier at 99.9%.</td>
+    <td>99.5%–99.9%</td>
+  </tr>
+  <tr>
+    <td><strong>Veutel</strong></td>
+    <td>UAE-focused, bank-grade encryption, automatic backups.</td>
+    <td><strong>99.9%</strong></td>
+  </tr>
+</table>
+
+<p><strong>The de facto standard is 99.9% uptime</strong> — equivalent to ~43 minutes downtime per month. This is the number customers expect, and most providers at least claim it.</p>
+
+<div class="info">
+  <strong>💰 Market reality:</strong> The TIA minimum (98.5%) might be legally sufficient, but it's not commercially competitive. If you're selling to SMEs who rely on your AP for their invoicing compliance, they will compare you against providers advertising 99.9%. You need to at least meet that bar in your SLA.
+</div>
+
+<h2>4. Our Recommended Architecture: Active-Active Behind a Load Balancer in Multiple EU Countries</h2>
+
+<p><strong>Yes, active-active across multiple EU regions is the right choice.</strong> Here's why and how:</p>
+
+<div class="diagram">
+                     ┌─────────────────────────────┐
+                     │      Peppol Network         │
+                     │    (other APs, SMP, SML)    │
+                     └──────────┬──────────────────┘
+                                │
+                    AS4 over HTTPS (port 443)
+                          DNS round-robin
+                          or GeoDNS
+                                │
+                    ┌───────────┴───────────┐
+                    │   Global Load         │
+                    │   Balancer (DNS)       │
+                    │   e.g. AWS Route53     │
+                    │   or Cloudflare DNS    │
+                    └───────────┬───────────┘
+                                │
+            ┌───────────────────┼───────────────────┐
+            │                   │                   │
+            ▼                   ▼                   ▼
+   ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
+   │   Region A     │  │   Region B     │  │   Region C     │
+   │ (e.g. Frankfurt)│  │ (e.g. Warsaw)  │  │ (e.g. Stockholm)│
+   │                │  │                │  │                │
+   │  ┌──────────┐  │  │  ┌──────────┐  │  │  ┌──────────┐  │
+   │  │ Nginx    │  │  │  │ Nginx    │  │  │  │ Nginx    │  │
+   │  │ (TLS term)│  │  │  │ (TLS term)│  │  │  │ (TLS term)│  │
+   │  └────┬─────┘  │  │  └────┬─────┘  │  │  └────┬─────┘  │
+   │       │        │  │       │        │  │       │        │
+   │  ┌────▼─────┐  │  │  ┌────▼─────┐  │  │  ┌────▼─────┐  │
+   │  │  API     │  │  │  │  API     │  │  │  │  API     │  │
+   │  │  Server  │  │  │  │  Server  │  │  │  │  Server  │  │
+   │  │ (Node.js)│  │  │  │ (Node.js)│  │  │  │ (Node.js)│  │
+   │  └────┬─────┘  │  │  └────┬─────┘  │  │  └────┬─────┘  │
+   │       │        │  │       │        │  │       │        │
+   │  ┌────▼─────┐  │  │  ┌────▼─────┐  │  │  ┌────▼─────┐  │
+   │  │ In-region│  │  │  │ In-region│  │  │  │ In-region│  │
+   │  │ DB/Store │  │  │  │ DB/Store │  │  │  │ DB/Store │  │
+   │  └──────────┘  │  │  └──────────┘  │  │  └──────────┘  │
+   └────────────────┘  └────────────────┘  └────────────────┘
+            │                   │                   │
+            └───────────────────┼───────────────────┘
+                                │
+                    ┌───────────▼───────────┐
+                    │  Cross-region sync    │
+                    │  (async replication)  │
+                    │  • Transaction log    │
+                    │  • Certificate state  │
+                    └───────────────────────┘
+</div>
+
+<h3>Why active-active? Why multiple EU regions?</h3>
+
+<table>
+  <tr><th>Factor</th><th>Active-passive</th><th>Active-active (our pick)</th></tr>
+  <tr>
+    <td>99.9% uptime achievable?</td>
+    <td>Yes, with automated failover</td>
+    <td><strong>Easier</strong> — no failover delay</td>
+  </tr>
+  <tr>
+    <td>Latency for Slovak customers</td>
+    <td>Depends on passive region</td>
+    <td><strong>Lowest</strong> — route to closest region</td>
+  </tr>
+  <tr>
+    <td>Capacity headroom</td>
+    <td>Passive site idles</td>
+    <td><strong>Full capacity</strong> at all times</td>
+  </tr>
+  <tr>
+    <td>Complexity</td>
+    <td>Lower</td>
+    <td><strong>Higher</strong> — cross-region sync needed</td>
+  </tr>
+  <tr>
+    <td>Cost</td>
+    <td>Lower (passive can be smaller)</td>
+    <td><strong>Higher</strong> — all regions active</td>
+  </tr>
+</table>
+
+<p><strong>Our recommendation:</strong> Start with <strong>2 EU regions</strong> in active-active (e.g. Frankfurt + Warsaw or Frankfurt + Stockholm). This gives you:</p>
+<ul>
+  <li>Geographic redundancy (different power grids, network backbones, legal jurisdictions within EU)</li>
+  <li>Low latency for both Western and Eastern European customers</li>
+  <li>Compliance with EU data residency (GDPR — data stays in EU)</li>
+  <li>If one region goes down, DNS/health-check routing sends traffic to the other (within seconds)</li>
+</ul>
+
+<div class="callout">
+  <strong>🧠 Why not just one region with multi-AZ?</strong> Multi-AZ within a single cloud region protects against datacenter failures but not against regional outages (which happen — AWS eu-central-1 had major outages in 2023 and 2024). For 99.9% SLA, multi-region is safer and still cost-effective at AP scale.
+</div>
+
+<h3>Load balancer strategy (Nginx or cloud LB)</h3>
+
+<table>
+  <tr><th>Layer</th><th>Component</th><th>Purpose</th></tr>
+  <tr>
+    <td>DNS</td>
+    <td>Cloudflare / Route53 <strong>GeoDNS + health checks</strong></td>
+    <td>Route senders to the closest healthy region. Automatically remove dead regions.</td>
+  </tr>
+  <tr>
+    <td>Regional</td>
+    <td><strong>Nginx</strong> or cloud LB (ALB/NLB)</td>
+    <td>TLS termination, rate limiting, AS4 SOAP routing to backend instances.</td>
+  </tr>
+  <tr>
+    <td>Application</td>
+    <td>Node.js AP instances behind the LB</td>
+    <td>Stateless AS4 processing (session state in DB/queue, not in memory).</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>🔧 Nginx config for AS4:</strong> The AS4 endpoint is a single <code>POST /as4/receive</code> SOAP endpoint. Nginx terminates TLS, forwards to upstream Node.js instances. The upstream can be scaled horizontally. Example snippet:
+  <pre style="margin:0.5em 0; font-size:0.75em">upstream ap-backend {
+    least_conn;
+    server 10.0.1.10:3000 max_fails=3 fail_timeout=30s;
+    server 10.0.1.11:3000 max_fails=3 fail_timeout=30s;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ap.mojafaktura.sk;
+
+    location /as4/receive {
+        proxy_pass http://ap-backend;
+        proxy_read_timeout 120s;
+        proxy_http_version 1.1;
+    }
+}</pre>
+</div>
+
+<h2>5. What Does a Pure Peppol AP Core Use a Database For?</h2>
+
+<p>This is a great question. The AP Core is <strong>not</strong> the same as the Service Platform (the customer portal with companies, users, etc.). The AP Core serves as the certified transport layer — and it still needs persistence. Here's exactly what:</p>
+
+<h3>Essential (AP certification boundary)</h3>
+
+<table>
+  <tr><th>Entity</th><th>Why it's needed</th><th>Key data</th></tr>
+  <tr>
+    <td><strong>Transactions</strong></td>
+    <td>
+      Required for:
+      <ul>
+        <li><strong>Duplicate detection</strong> — AS4 step 12: if a message arrives with the same <code>messageId</code> seen before, you must re-send the receipt but <em>not</em> re-process the payload</li>
+        <li><strong>Message replay</strong> — if your downstream system crashes, you need to re-deliver the payload</li>
+        <li><strong>Peppol compliance reporting</strong> — monthly statistics to the Peppol Authority</li>
+        <li><strong>Audit trail</strong> — prove what was sent/received and when</li>
+      </ul>
+    </td>
+    <td>
+      <code>messageId</code>, <code>direction</code>, <code>status</code>,<br>
+      <code>senderId</code>, <code>receiverId</code>, <code>senderAPId</code>, <code>receiverAPId</code>,<br>
+      <code>docTypeId</code>, <code>processId</code>, <code>transportProfile</code>,<br>
+      <code>timestamp</code>, <code>completedAt</code>,<br>
+      raw SOAP body (for replay), receipt XML
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Identity (Certificates)</strong></td>
+    <td>
+      Your AP's Peppol-issued certificate + private key. You may have multiple certs during rotation.
+    </td>
+    <td>
+      <code>certId</code>, <code>certPem</code>, <code>privKeyPem</code> (encrypted),<br>
+      <code>createdAt</code>, <code>expiresAt</code>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Truststore</strong></td>
+    <td>Peppol root and intermediate CA certificates to validate other APs' signatures.</td>
+    <td>File on disk: PEM bundle of Peppol CAs</td>
+  </tr>
+  <tr>
+    <td><strong>SMP Cache</strong></td>
+    <td>
+      Caching participant lookup results avoids repeated DNS + SMP queries. Every send requires resolving the receiver's endpoint and certificate. Without caching, you'd hit DNS/SMP for every send.
+    </td>
+    <td>
+      <code>participantId</code>, <code>endpointUrl</code>, <code>certificate</code>,<br>
+      <code>transportProfile</code>, <code>resolvedAt</code>, <code>ttl</code>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Document payloads</strong></td>
+    <td>
+      The actual UBL XML documents sent/received. Stored separately from transaction metadata for efficiency.
+    </td>
+    <td>UBL XML file in object storage (S3, R2, or filesystem)</td>
+  </tr>
+</table>
+
+<h3>What is NOT in the AP Core DB</h3>
+
+<table>
+  <tr><th>Entity</th><th>Where it lives</th><th>Why it's not AP Core</th></tr>
+  <tr><td>Companies (SMEs)</td><td>Service Platform PostgreSQL</td><td>Your customer management — not part of the Peppol transport layer</td></tr>
+  <tr><td>Users &amp; authentication</td><td>Service Platform PostgreSQL</td><td>Login/password/RBAC — pure business logic</td></tr>
+  <tr><td>Business documents + lines</td><td>Service Platform PostgreSQL</td><td>Invoice line items, amounts, tax codes — value-add features</td></tr>
+  <tr><td>API keys for 3rd parties</td><td>Service Platform PostgreSQL</td><td>Integration credentials — your product</td></tr>
+  <tr><td>Audit log (user actions)</td><td>Service Platform PostgreSQL</td><td>Who clicked what — business concern</td></tr>
+</table>
+
+<div class="info">
+  <strong>💡 The clean separation:</strong> The AP Core knows about <em>messages</em> but not about <em>customers</em>. It stores:
+  <ul>
+    <li>Transaction metadata + payloads (for replay, dedup, compliance)</li>
+    <li>Its own identity (certificates)</li>
+    <li>SMP lookup cache (performance)</li>
+  </ul>
+  It does <strong>not</strong> store companies, users, invoices, or any business-domain data. That's the Service Platform's job. The AP Core processes messages; the Service Platform processes invoices.
+</div>
+
+<h3>What kind of database?</h3>
+
+<p>For a pure AP Core:</p>
+<ul>
+  <li><strong>Transactions:</strong> A document DB that supports composite key lookups. Node42 ships with adapters for <strong>AWS DynamoDB</strong>, <strong>Azure CosmosDB</strong>, and a local <strong>JSON file</strong>. DynamoDB is a good fit: you query by <code>messageId</code> (for dedup) or by <code>participantId</code> (for reporting).</li>
+  <li><strong>SMP Cache:</strong> Same DB as transactions, or a simple in-memory cache with TTL + periodic refresh. Loss of cache is not catastrophic — just means a DNS lookup penalty on the next send.</li>
+  <li><strong>Certificates:</strong> Encrypted at rest in a secrets manager (AWS Secrets Manager, HashiCorp Vault) or in the same DB with envelope encryption.</li>
+  <li><strong>Payloads:</strong> Object storage (S3, R2, MinIO, or filesystem) — not the transaction DB. UBL XML payloads can be large (up to 2 GB per Peppol spec), and storing them in DynamoDB would be slow and expensive.</li>
+</ul>
+
+<div class="callout">
+  <strong>⚡ Prototype shortcut:</strong> For early development, use SQLite or a JSON file for the transaction log + in-memory SMP cache + filesystem for payloads. One machine, no cloud dependencies. Migrate to DynamoDB + S3 when you go production.
+</div>
+
+<h2>6. Capacity Planning</h2>
+
+<h3>Step 1: Estimate your volume</h3>
+
+<p>For a Slovak-market AP targeting SMEs in 2027+:</p>
+
+<table>
+  <tr><th>Tier</th><th>SMEs</th><th>Invoices/SME/month</th><th>Total invoices/month</th><th>Peak (10× daily avg)</th></tr>
+  <tr>
+    <td>Startup</td>
+    <td>50</td>
+    <td>50</td>
+    <td><strong>2,500</strong></td>
+    <td>~6 req/s</td>
+  </tr>
+  <tr>
+    <td>Growth</td>
+    <td>500</td>
+    <td>80</td>
+    <td><strong>40,000</strong></td>
+    <td>~24 req/s</td>
+  </tr>
+  <tr>
+    <td>Scale</td>
+    <td>5,000</td>
+    <td>100</td>
+    <td><strong>500,000</strong></td>
+    <td>~75 req/s</td>
+  </tr>
+  <tr>
+    <td>Mature</td>
+    <td>20,000</td>
+    <td>120</td>
+    <td><strong>2,400,000</strong></td>
+    <td>~250 req/s</td>
+  </tr>
+</table>
+
+<p><strong>Assumptions:</strong></p>
+<ul>
+  <li>Peppol B2B mandate drives adoption: ~60,000 SMEs in Slovakia need Peppol connectivity</li>
+  <li>10% of monthly volume happens on the busiest day (month-end invoicing spike)</li>
+  <li>Busiest hour is ~20% of the busiest day</li>
+  <li>Each transaction is ~1 request (send) + 1 response (receipt) = 2 HTTP round-trips at the AS4 level</li>
+  <li>Additional overhead: SMP lookups (~1 per unique participant), validation</li>
+</ul>
+
+<h3>Step 2: Hardware sizing per region (for active-active across 2 regions)</h3>
+
+<table>
+  <tr><th>Tier</th><th>Instance type (per region)</th><th>vCPU</th><th>RAM</th><th>Storage</th><th>Estimated monthly cost per region</th></tr>
+  <tr>
+    <td>Startup</td>
+    <td>2 × small VM (e.g. Hetzner CX22 or AWS t3.small)</td>
+    <td>2 × 2</td>
+    <td>2 × 4 GB</td>
+    <td>2 × 40 GB SSD</td>
+    <td>~€15–30</td>
+  </tr>
+  <tr>
+    <td>Growth</td>
+    <td>2 × medium VM (e.g. Hetzner CX32 or AWS t3.medium)</td>
+    <td>2 × 2</td>
+    <td>2 × 8 GB</td>
+    <td>2 × 80 GB SSD</td>
+    <td>~€40–80</td>
+  </tr>
+  <tr>
+    <td>Scale</td>
+    <td>4 × medium VM (Hetzner CX42 or AWS c6i.large)</td>
+    <td>4 × 2</td>
+    <td>4 × 8 GB</td>
+    <td>4 × 100 GB SSD</td>
+    <td>~€120–250</td>
+  </tr>
+  <tr>
+    <td>Mature</td>
+    <td>6+ × large VM (Hetzner CX62 or AWS c6i.xlarge)</td>
+    <td>6+ × 4</td>
+    <td>6+ × 16 GB</td>
+    <td>6+ × 150 GB SSD + S3</td>
+    <td>~€400–800</td>
+  </tr>
+</table>
+
+<p><strong>Notes on hardware:</strong></p>
+<ul>
+  <li>Node.js is single-threaded per process. Run <strong>1 instance per CPU core</strong> behind Nginx (cluster mode). For a 2-vCPU machine, run 2 Node.js workers.</li>
+  <li>The AS4 processing is mostly <strong>I/O bound</strong> (network calls for SMP, crypto operations are async, DB writes). CPU is rarely the bottleneck.</li>
+  <li><strong>Memory:</strong> Each AS4 payload can be up to 2 GB (Peppol spec). In practice, invoices are 10–100 KB. But you need enough RAM to handle concurrent large payloads during the spike.</li>
+  <li><strong>Disk:</strong> Transaction logs and payloads grow. Plan retention: 90 days for operational data, 7 years for audit (Slovak accounting law). Archive old payloads to cold storage.</li>
+</ul>
+
+<h3>Step 3: Database sizing</h3>
+
+<table>
+  <tr><th>Tier</th><th>Transaction log</th><th>SMP cache</th><th>Payload storage</th></tr>
+  <tr>
+    <td>Startup</td>
+    <td>~2,500 rows/month = trivial</td>
+    <td>~1,000 entries</td>
+    <td>~250 MB/month</td>
+  </tr>
+  <tr>
+    <td>Growth</td>
+    <td>~40,000 rows/month</td>
+    <td>~5,000 entries</td>
+    <td>~4 GB/month</td>
+  </tr>
+  <tr>
+    <td>Scale</td>
+    <td>~500,000 rows/month</td>
+    <td>~50,000 entries</td>
+    <td>~50 GB/month</td>
+  </tr>
+  <tr>
+    <td>Mature</td>
+    <td>~2.4M rows/month</td>
+    <td>~200,000 entries</td>
+    <td>~240 GB/month</td>
+  </tr>
+</table>
+
+<p><strong>Recommended DB setup per tier:</strong></p>
+<ul>
+  <li><strong>Startup–Growth:</strong> DynamoDB on-demand or a single SQLite/PostgreSQL instance. Payloads on local disk or S3.</li>
+  <li><strong>Scale:</strong> DynamoDB provisioned (1,000–5,000 WCU, 5,000–20,000 RCU) + S3 for payloads + in-region read replica for reporting.</li>
+  <li><strong>Mature:</strong> Cross-region DynamoDB Global Tables + S3 cross-region replication + separate reporting read replica per region.</li>
+  </ul>
+
+<h3>Step 4: Network requirements</h3>
+
+<table>
+  <tr><th>Component</th><th>Requirement</th></tr>
+  <tr><td>AS4 endpoint</td><td>HTTPS on <strong>port 443</strong>, TLS 1.2+ with valid Peppol certificate</td></tr>
+  <tr><td>Latency to other APs</td><td>Should be &lt; 500 ms for AS4 round-trip (EU-to-EU is typically &lt; 100 ms)</td></tr>
+  <tr><td>Bandwidth</td><td>At scale: at least 1 Gbps per region (payloads up to 2 GB each)</td></tr>
+  <tr><td>DNS</td><td>Your AP's endpoint is published in the SML via NAPTR/SRV records. These can point to multiple A/AAAA records for built-in DNS-level failover.</td></tr>
+  <tr><td>Firewall</td><td>Only port 443 (AS4 inbound) + management ports locked to your IP. Node42 also needs outbound access for SMP queries.</td></tr>
+</table>
+
+<h2>7. Proposed Phased Approach</h2>
+
+<table>
+  <tr><th>Phase</th><th>Architecture</th><th>Regions</th><th>DB</th><th>Runs until</th></tr>
+  <tr>
+    <td><strong>1. Prototype</strong></td>
+    <td>Single VPS: everything together</td>
+    <td>1 (Hetzner Falkenstein/FSN1)</td>
+    <td>SQLite + in-memory cache + filesystem</td>
+    <td>Accreditation</td>
+  </tr>
+  <tr>
+    <td><strong>2. MVP</strong></td>
+    <td>Single region, load-balanced across 2 VMs</td>
+    <td>1 (Hetzner FSN1 + NBG1)</td>
+    <td>PostgreSQL (AP Core transactions) + S3-compatible (MinIO) for payloads</td>
+    <td>First 100 SMEs</td>
+  </tr>
+  <tr>
+    <td><strong>3. Production</strong></td>
+    <td>Active-active, 2 EU regions</td>
+    <td>Frankfurt + Warsaw</td>
+    <td>DynamoDB Global Tables (or CockroachDB) + S3 cross-region replication</td>
+    <td>100–5,000 SMEs</td>
+  </tr>
+  <tr>
+    <td><strong>4. Scale</strong></td>
+    <td>Multi-region with 3+ EU regions</td>
+    <td>Frankfurt + Warsaw + Stockholm</td>
+    <td>Same as above + read replicas + CDN for customer API</td>
+    <td>5,000+ SMEs</td>
+  </tr>
+</table>
+
+<h2>8. Recommended HW Configuration (Phase 3 — Production)</h2>
+
+<p>Per region, for up to 5,000 SMEs sending ~100 invoices/month each:</p>
+
+<div class="diagram">┌─── Region: Frankfurt (eu-central-1) ──────────────────────┐
+│                                                           │
+│  ┌─────────────────┐  ┌─────────────────┐                │
+│  │  Nginx LB node   │  │  Nginx LB node   │              │
+│  │  (2 vCPU, 4 GB)  │  │  (2 vCPU, 4 GB)  │              │
+│  └────────┬────────┘  └────────┬────────┘                │
+│           │                    │                         │
+│  ┌────────┴────────┐  ┌────────┴────────┐                │
+│  │  AP Node 1      │  │  AP Node 2      │                │
+│  │  (4 vCPU, 8 GB)  │  │  (4 vCPU, 8 GB)  │              │
+│  │  Node.js ×4     │  │  Node.js ×4     │                │
+│  └────────┬────────┘  └────────┬────────┘                │
+│           │                    │                         │
+│  ┌────────┴────────────────────┴────────┐                │
+│  │  DynamoDB (transactions + SMP cache)  │               │
+│  │  on-demand capacity                  │                │
+│  └──────────────────────────────────────┘                │
+│  ┌──────────────────────────────────────┐                │
+│  │  S3 / MinIO (payload store)          │                │
+│  └──────────────────────────────────────┘                │
+│                                                           │
+│  ╔══════════════════════════════════════════════════════╗  │
+│  ║   Cross-region: async replication to Warsaw         ║  │
+│  ║   • DynamoDB Global Table                          ║  │
+│  ║   • S3 cross-region replication                    ║  │
+│  ╚══════════════════════════════════════════════════════╝  │
+└───────────────────────────────────────────────────────────┘</div>
+
+<table>
+  <tr><th>Component</th><th>Spec</th><th>Per region</th></tr>
+  <tr><td>Nginx LB</td><td>2 vCPU, 4 GB RAM, 40 GB SSD</td><td>2 nodes (HA pair)</td></tr>
+  <tr><td>AP app server</td><td>4 vCPU, 8 GB RAM, 80 GB SSD</td><td>2–3 nodes</td></tr>
+  <tr><td>Transaction DB</td><td>DynamoDB on-demand or managed PostgreSQL 8 GB</td><td>1 instance (with Multi-AZ)</td></tr>
+  <tr><td>Payload storage</td><td>S3 or S3-compatible</td><td>1 bucket per region</td></tr>
+  <tr><td>SMP cache</td><td>In-process memory + DynamoDB persistence</td><td>Shared with transactions</td></tr>
+  <tr><td>Monitoring</td><td>Prometheus + Grafana + uptime checks</td><td>1 small VM</td></tr>
+  <tr><td>Total per region</td><td></td><td><strong>~€200–350/month</strong></td></tr>
+  <tr><td>Total (2 regions)</td><td></td><td><strong>~€400–700/month</strong></td></tr>
+</table>
+
+<h2>9. Summary</h2>
+
+<table>
+  <tr><th>Question</th><th>Answer</th></tr>
+  <tr>
+    <td>Is HA required by Peppol?</td>
+    <td>The TIA minimum (98.5%/94%) does not strictly require active-active HA. A DR environment + contingency plan is the minimum.</td>
+  </tr>
+  <tr>
+    <td>What do commercial providers do?</td>
+    <td><strong>99.9% uptime</strong> is the market norm — multi-AZ or multi-region, redundant endpoints, often SOC2/ISO27001 certified.</td>
+  </tr>
+  <tr>
+    <td>Our recommended architecture?</td>
+    <td><strong>Active-active across 2 EU regions</strong> (Frankfurt + Warsaw) behind GeoDNS + Nginx/cloud load balancer.</td>
+  </tr>
+  <tr>
+    <td>What DB does a pure AP Core need?</td>
+    <td>Transaction log (dedup + reporting) + certificate store + SMP cache + payload storage. Document DB (DynamoDB) + object storage (S3).</td>
+  </tr>
+  <tr>
+    <td>Biggest risk without HA?</td>
+    <td>Not downtime itself, but <strong>data loss</strong> in the transaction log. The protocol retries cover brief outages, but once a message is accepted, it must be durably stored.</td>
+  </tr>
+  <tr>
+    <td>Minimum viable production setup?</td>
+    <td>Single region, 2 app servers behind LB + DynamoDB/S3 + separate DR environment + documented failover plan.</td>
+  </tr>
+  <tr>
+    <td>Proto-to-production cost?</td>
+    <td>Starts at ~€15–30/month (single VPS) → ~€400–700/month (2-region HA, 5,000 SMEs).</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>🎯 Bottom line:</strong> The protocol gives you slack (2-hour retry window), but reputation demands 99.9%. Active-active multi-region is the right architecture for a serious AP. Start simple, add regions as you grow. The database question is simpler than it seems: your AP Core needs <em>message-level</em> persistence (transaction log + payloads + certs), not <em>business-level</em> persistence (companies, users, invoices) — that's the Service Platform's job.
+</div>
+
+<hr>
+
+<h2>✅ You can now explain</h2>
+<ol>
+  <li>The Peppol TIA minimum SLA requirements (98.5%/94%) and what they mean in practice</li>
+  <li>How the AS4 retry protocol (≥3 retries in 2 hours) gives you operational slack</li>
+  <li>What database a pure AP Core actually needs (transactions, certs, SMP cache, payloads)</li>
+  <li>Why a pure AP Core does <strong>not</strong> need companies/users/invoices — that's the Service Platform</li>
+  <li>The active-active multi-region architecture with Nginx/cloud load balancing</li>
+  <li>Capacity planning: from startup (2,500 invoices/month) to mature (2.4M invoices/month)</li>
+  <li>Hardware sizing per tier, per region</li>
+  <li>The phased approach: prototype → MVP → production → scale</li>
+</ol>
+
+<h2>📚 References</h2>
+<ul>
+  <li><a href="https://peppol.agid.gov.it/attachments/annex3-servicesandservicelevels.pdf">PEPPOL TIA Annex 3 — Services and Service Levels</a></li>
+  <li><a href="https://anskaffelser.dev/payment/g1/docs/current/requirements-ap/">Requirements to Access Point in Financial Network (Norwegian)</a></li>
+  <li><a href="https://ecosio.com/en/blog/7-things-to-consider-when-selecting-a-peppol-access-point/">7 Things to Consider When Selecting a Peppol Access Point (ecosio)</a></li>
+  <li><a href="../reference/ap-core-interface.html">AP Core Interface Reference</a></li>
+  <li>Node42 <code>src/db/adapters/</code> — DynamoDB, CosmosDB, and JSON file adapters for the transaction log</li>
+</ul>
+
+<h2>🤔 Questions?</h2>
+<p>This covers the production infrastructure view. The key architectural decision is: <strong>active-active vs active-passive</strong> — and our bet is that active-active across 2 EU regions is the right call for a serious Peppol AP provider. If you're thinking about starting simpler (single region with multi-AZ), that's also a valid Phase 2 target.</p>
+
+<div class="footer">
+  <p>Lesson 6 of the Peppol Service Provider series. See also: <a href="0004-architecture-and-project-setup.html">Lesson 4: Architecture &amp; Project Setup</a> | <a href="../reference/glossary.html">Glossary</a></p>
+</div>
+
+</body>
+</html>
