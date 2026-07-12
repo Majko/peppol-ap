@@ -243,7 +243,19 @@
 </table>
 
 <div class="callout callout-amber">
-  <strong>🟡 Still to implement:</strong> Full Peppol BIS 3.0 Schematron has ~60–80 rules. Next priorities: R003 (BT-3), R010/R011 (VAT breakdown consistency), R040/R041 (country matching), R053/R054 (unit code), DE-specific rules, SK-specific PASR rules.
+  <strong>🟡 Still to implement:</strong> Full Peppol BIS 3.0 Schematron has ~60–80 rules. Next priorities: R003 (BT-3), R010/R011 (VAT breakdown consistency), R040/R041 (country matching), R053/R054 (unit code), DE-specific rules.
+  <br><br>
+  <strong>📋 Slovak PASR — implemented:</strong>
+  <ul style="margin: 0.5em 0 0 1em">
+    <li><strong>PASR-SK-001</strong>: scheme <code>0245</code> (Slovak DIČ) endpoints must be exactly 10 digits — ✅ implemented Phase 22</li>
+    <li>Tax Data Document routing — ⏳ pending (spec not yet published by PA SK)</li>
+  </ul>
+  <strong>📋 Slovak PASR — waiting for spec:</strong>
+  <ul style="margin: 0.5em 0 0 1em">
+    <li>Tax Data Document format — "mandatory Tax Data Document will be shared in due time" (PASR Section 6)</li>
+    <li>IS EFA / 5th-corner reporting format details</li>
+    <li>Any additional VAT validation rules from Slovak VAT Act (Zákon č. 222/2004 Z. z.)</li>
+  </ul>
 </div>
 
 <h2>6. Code list validations</h2>
@@ -258,7 +270,7 @@
   <tr><td>Invoice type</td><td><code>380</code>, <code>381</code>, <code>383</code>, <code>384</code>, <code>386</code>, <code>389</code></td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL1001-inv/">UNCL1001</a></td></tr>
   <tr><td>Unit codes</td><td><code>C62</code> (piece), <code>DAY</code>, <code>HUR</code>, <code>KGM</code>, <code>MTR</code>, <code>LTR</code> … (UNECE Rec20)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNECERec20/">Rec20</a></td></tr>
   <tr><td>Payment means</td><td><code>30</code> (credit transfer), <code>42</code> (bank payment), <code>58</code> (SEPA)</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/UNCL4461/">UNCL4461</a></td></tr>
-  <tr><td>EAS / schemeID</td><td><code>0088</code> (GLN), <code>0192</code> (BIC), <code>9914</code> (VAT), <code>0130</code> (company reg) …</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/eas/">EAS list</a></td></tr>
+  <tr><td>EAS / schemeID</td><td><code>0088</code> (GLN), <code>0192</code> (BIC), <code>9914</code> (VAT), <code>0130</code> (company reg), <code>0245</code> (SK DIČ) …</td><td><a href="https://docs.peppol.eu/poacc/billing/3.0/codelist/eas/">EAS list</a></td></tr>
 </table>
 
 <h2>7. Document type identifier (the long string)</h2>

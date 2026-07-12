@@ -64,6 +64,7 @@ const VALID_ENDPOINT_SCHEME_IDS = new Set([
   'iso6523-actorid-upis',
   '0088',
   '0002',
+  '0245', // Slovak DIČ (Daňové identifikačné číslo) — 10 digits, PASR requirement
 ]);
 
 // SK VAT ID pattern: SK followed by exactly 10 digits
@@ -194,6 +195,34 @@ export function validateUBL(xmlString) {
         )
       );
     }
+  }
+
+  // ============================================================
+  // Phase 22: PASR SK — scheme 0245 (Slovak DIČ) must be exactly 10 digits
+  // Ref: Peppol Authority Specific Requirements for SK, Section 1
+  // "0245:XXXXXXXXXX — ten-digit Tax Identification Number"
+  // ============================================================
+  function validateSKDIČFormat(endpointID, schemeID, partyType) {
+    if (schemeID === '0245') {
+      // Strip any whitespace
+      const id = (endpointID || '').replace(/\s/g, '');
+      if (!/^\d{10}$/.test(id)) {
+        errors.push(
+          makeError(
+            'PASR-SK-001',
+            'fatal',
+            `Slovak DIČ (scheme 0245) must be exactly 10 digits for ${partyType}, got: '${endpointID}'`,
+            `/Invoice/cac:Accounting${partyType}Party/cac:Party/cbc:EndpointID`
+          )
+        );
+      }
+    }
+  }
+  if (doc.seller) {
+    validateSKDIČFormat(doc.seller.endpointID, doc.seller.endpointSchemeID, 'Supplier');
+  }
+  if (doc.buyer) {
+    validateSKDIČFormat(doc.buyer.endpointID, doc.buyer.endpointSchemeID, 'Customer');
   }
 
   // Phase 3b: Validate ProfileID value (exact match)
