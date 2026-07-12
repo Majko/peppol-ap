@@ -180,9 +180,7 @@ export async function verifyIncomingSignature(soapEnvelope, senderId = null, cer
     // ── Trust chain validation against OpenPeppol PKI ─────────────────────
     const trustResult = await verifyTrustChain(cert, senderId);
     if (!trustResult.valid) {
-      const trustError = new TrustChainValidationError(trustResult.reason || trustResult.error, senderId);
-      trustError.code = trustResult.reason === 'expired' ? 'EB:005' : 'EB:003';
-      throw trustError;
+      throw new TrustChainValidationError(trustResult.reason || trustResult.error, senderId);
     }
 
     // Use xml-crypto to verify the signature
