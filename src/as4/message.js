@@ -479,7 +479,16 @@ export async function parseAS4Message(mimeMessage) {
 
   // Extract fields from SOAP envelope using regex (same as before)
   const msgIdMatch = soapEnvelope.match(/<eb:MessageId>(.*?)<\/eb:MessageId>/);
-  if (msgIdMatch) result.messageId = msgIdMatch[1];
+  if (msgIdMatch) {
+    const messageId = msgIdMatch[1];
+    const uuidPattern = /^uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@[\w.-]+$/;
+    if (!uuidPattern.test(messageId)) {
+      const err = new Error(`Invalid MessageId format: ${messageId}`);
+      err.ebms_code = EbMSErrorCodes.EB003_VALUE_FORMAT;
+      throw err;
+    }
+    result.messageId = messageId;
+  }
 
   const tsMatch = soapEnvelope.match(/<eb:Timestamp>(.*?)<\/eb:Timestamp>/);
   if (tsMatch) result.timestamp = tsMatch[1];
@@ -518,6 +527,15 @@ export async function parseAS4Message(mimeMessage) {
   // Extract payload
   if (payloadAttachment) {
     result.payload = payloadAttachment.replace(/--MIME-Boundary.*$/m, '').trim();
+  }
+
+  // Warn if eb:Messaging header lacks soap:mustUnderstand="true"
+  const ebMessagingMatch = soapEnvelope.match(/<eb:Messaging[^>]*>/);
+  if (ebMessagingMatch) {
+    const ebMessagingTag = ebMessagingMatch[0];
+    if (!/soap:mustUnderstand\s*=\s*["']true["']/.test(ebMessagingTag)) {
+      console.warn('eb:Messaging header missing soap:mustUnderstand="true" — may not be processed by strict AS4 peers');
+    }
   }
 
   return result;
@@ -568,8 +586,7 @@ export function buildAS4Error(code, message, details = null, refMessageId = null
           <eb:Timestamp>${esc(timestamp)}</eb:Timestamp>
           <eb:MessageId>${esc(errorMessageId)}</eb:MessageId>
         </eb:MessageInfo>
-        <eb:Error category="urn:oasis-open:ebxml-msg:ebms:errors" code="${esc(code)}">
-          <eb:ErrorCode>${esc(code)}</eb:ErrorCode>
+        <eb:Error category="urn:oasis:names:ebxml-msg:errors:ebms" code="${esc(code)}">
           <eb:Severity>failure</eb:Severity>
           ${detailsLines}
           ${refMessageId ? `<eb:RefToMessageId>${esc(refMessageId)}</eb:RefToMessageId>` : ''}
