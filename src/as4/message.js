@@ -12,6 +12,14 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { simpleParser } from 'mailparser';
 import { simulationMode } from '../simulation.js';
+import { TrustChainValidationError } from '../errors.js';
+
+// Lazy import for Node42 to avoid top-level await issues
+let _n42 = null;
+async function n42() {
+  if (!_n42) _n42 = await import('@n42/edelivery');
+  return _n42;
+}
 
 const DS_NS = 'http://www.w3.org/2000/09/xmldsig#';
 
@@ -46,6 +54,62 @@ export function getSimSigningKeyPath() {
 }
 
 /**
+ * Validate the trust chain of a sender's certificate against the OpenPeppol PKI
+ * using Node42's validateCert.
+ *
+ * @param {string} certPem - Sender's X.509 certificate in PEM format
+ * @param {string} [certId] - Optional cert identifier for error messages
+ * @returns {Promise<{ valid: boolean, error?: string, simulated?: boolean }>}
+ */
+export async function verifyTrustChain(certPem, certId = null) {
+  // In simulation mode, skip trust chain validation
+  if (simulationMode) {
+    return { valid: true, simulated: true };
+  }
+
+  try {
+    const n42mod = await n42();
+    const ctx = new n42mod.N42Context({
+      env: process.env.PEPPOL_ENV || 'test',
+      timeout: 10000,
+    });
+
+    const result = await n42mod.validateCert(ctx, certPem);
+
+    if (!result.valid) {
+      const reason = result.reason || 'Certificate trust chain validation failed';
+      return {
+        valid: false,
+        error: reason,
+        reason,
+      };
+    }
+
+    return { valid: true };
+  } catch (err) {
+    // Surface Node42 errors that indicate trust chain failure
+    if (err.name === 'CertExpiredError' || err.message?.includes('expired')) {
+      return {
+        valid: false,
+        error: `Trust chain validation failed: certificate expired`,
+        reason: 'expired',
+      };
+    }
+    if (err.name === 'TrustChainValidationError') {
+      return {
+        valid: false,
+        error: err.message,
+        reason: 'not_in_pki',
+      };
+    }
+    return {
+      valid: false,
+      error: `Trust chain validation error: ${err.message}`,
+    };
+  }
+}
+
+/**
  * Verify an incoming SOAP message signature using xml-crypto with RSA-SHA256.
  *
  * Extracts the ds:Signature from the wsse:Security header, then verifies
@@ -54,10 +118,10 @@ export function getSimSigningKeyPath() {
  * @param {string} soapEnvelope - The raw SOAP envelope XML string
  * @param {string} [senderId] - Sender participant ID (used for SMP lookup fallback)
  * @param {string} [certPem] - Sender's X.509 certificate in PEM format (optional; extracted from envelope or looked up)
- * @returns {{ valid: boolean, error?: string, simulated?: boolean }}
+ * @returns {Promise<{ valid: boolean, error?: string, simulated?: boolean }>}
  */
-export function verifyIncomingSignature(soapEnvelope, senderId = null, certPem = null) {
-  // In simulation mode, skip cryptographic verification
+export async function verifyIncomingSignature(soapEnvelope, senderId = null, certPem = null) {
+  // In simulation mode, skip cryptographic verification and trust chain validation
   if (simulationMode) {
     return { valid: true, simulated: true };
   }
@@ -111,6 +175,14 @@ export function verifyIncomingSignature(soapEnvelope, senderId = null, certPem =
         valid: false,
         error: 'No sender certificate available for signature verification. SMP lookup not yet implemented.',
       };
+    }
+
+    // ── Trust chain validation against OpenPeppol PKI ─────────────────────
+    const trustResult = await verifyTrustChain(cert, senderId);
+    if (!trustResult.valid) {
+      const trustError = new TrustChainValidationError(trustResult.reason || trustResult.error, senderId);
+      trustError.code = trustResult.reason === 'expired' ? 'EB:005' : 'EB:003';
+      throw trustError;
     }
 
     // Use xml-crypto to verify the signature
@@ -389,6 +461,17 @@ export async function parseAS4Message(mimeMessage) {
 
   result.rawSoap = soapEnvelope;
 
+  // Detect signal type: eb:SignalMessage (Receipt or Error) vs eb:UserMessage
+  if (/<\?xml[^>]*\?>\s*<[^>]*:Envelope[^>]*>[\s\S]*?<[^>]*:Messaging[\s\S]*?<[^>]*:SignalMessage[\s\S]*?<\/[^>]*:SignalMessage[\s\S]*?<\/[^>]*:Messaging>/.test(soapEnvelope)) {
+    result.signalType = 'SignalMessage';
+  } else if (/<[^>]*:UserMessage[\s\S]*?<\/[^>]*:UserMessage>/.test(soapEnvelope)) {
+    result.signalType = 'UserMessage';
+  }
+
+  // Extract refMessageId — used by Receipt and Error signals to reference the target message
+  const refMsgMatch = soapEnvelope.match(/<eb:RefToMessageId>(.*?)<\/eb:RefToMessageId>/);
+  if (refMsgMatch) result.refMessageId = refMsgMatch[1];
+
   // Extract fields from SOAP envelope using regex (same as before)
   const msgIdMatch = soapEnvelope.match(/<eb:MessageId>(.*?)<\/eb:MessageId>/);
   if (msgIdMatch) result.messageId = msgIdMatch[1];
@@ -456,9 +539,10 @@ export const EbMSErrorCodes = {
  * @param {string} message - Short human-readable error description
  * @param {string} [details] - Optional detailed error message
  * @param {string} [refMessageId] - Original message ID being rejected
+ * @param {string} [signingKeyPath] - Optional path to PEM private key for signing
  * @returns {string} AS4 error signal XML
  */
-export function buildAS4Error(code, message, details = null, refMessageId = null) {
+export function buildAS4Error(code, message, details = null, refMessageId = null, signingKeyPath = null) {
   const timestamp = new Date().toISOString();
   const errorMessageId = `error:${Date.now()}@ap.mojafaktura.sk`;
 
@@ -466,9 +550,12 @@ export function buildAS4Error(code, message, details = null, refMessageId = null
     ? `<eb:Description>${esc(message)}${details ? '\n' + esc(details) : ''}</eb:Description>`
     : `<eb:Description>${esc(message)}</eb:Description>`;
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
+  const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
-               xmlns:eb="http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/">
+               xmlns:eb="http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/"
+               xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+               xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+               xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
   <soap:Header>
     <eb:Messaging>
       <eb:SignalMessage>
@@ -484,9 +571,28 @@ export function buildAS4Error(code, message, details = null, refMessageId = null
         </eb:Error>
       </eb:SignalMessage>
     </eb:Messaging>
+    <wsse:Security soap:mustUnderstand="true">
+      <wsse:BinarySecurityToken EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary" ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3">test-cert-placeholder</wsse:BinarySecurityToken>
+    </wsse:Security>
   </soap:Header>
   <soap:Body/>
 </soap:Envelope>`;
+
+  let finalEnvelope = soapEnvelope;
+
+  // Sign the error signal if a key is available
+  if (signingKeyPath && existsSync(signingKeyPath)) {
+    try {
+      const certPath = signingKeyPath.replace('-key.pem', '-cert.pem');
+      const certPem = existsSync(certPath) ? readFileSync(certPath, 'utf8') : null;
+      finalEnvelope = signXml(soapEnvelope, signingKeyPath, certPem);
+    } catch (err) {
+      // Log but don't fail — return unsigned if signing fails
+      console.error('AS4 error signing failed:', err.message);
+    }
+  }
+
+  return finalEnvelope;
 }
 
 /**

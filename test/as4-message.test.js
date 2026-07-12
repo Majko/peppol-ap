@@ -262,5 +262,25 @@ describe('AS4 Message', () => {
       // The code attribute on eb:Error
       expect(xml).toMatch(/<eb:Error[^>]*code="EB:007"/);
     });
+
+    it('should produce a signed error signal with ds:Signature when signing key is provided', () => {
+      const xml = buildAS4Error(
+        EbMSErrorCodes.EB001_MESSAGE_STRUCTURE,
+        'Test error',
+        null,
+        null,
+        SIM_KEY_PATH
+      );
+
+      // Verify signature elements are present (Signature is namespace-qualified, prefix varies by xml-crypto output)
+      expect(xml).toContain('Signature xmlns="http://www.w3.org/2000/09/xmldsig#"');
+      expect(xml).toContain('<SignedInfo>');
+      expect(xml).toContain('<SignatureValue>');
+      expect(xml).toContain('<DigestValue>');
+      // RSA-SHA256 signature method
+      expect(xml).toContain('http://www.w3.org/2001/04/xmldsig-more#rsa-sha256');
+      // SHA-256 digest
+      expect(xml).toContain('http://www.w3.org/2001/04/xmlenc#sha256');
+    });
   });
 });
