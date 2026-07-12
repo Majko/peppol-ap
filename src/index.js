@@ -18,7 +18,7 @@ import { generateInvoice, generateCreditNote } from './ubl/generator.js';
 import { parseUBL } from './ubl/parser.js';
 import { validateUBL } from './ubl/validator.js';
 import { buildSBDH, parseSBDH } from './as4/sbdh.js';
-import { buildAS4Message, parseAS4Message, verifyIncomingSignature, signXml, getSimSigningKeyPath } from './as4/message.js';
+import { buildAS4Message, parseAS4Message, verifyIncomingSignature, buildAS4Error, signXml, getSimSigningKeyPath } from './as4/message.js';
 import { decryptPayload, isEncrypted } from './as4/encryption.js';
 import * as node42 from './as4/node42.js';
 import * as simulator from './simulator.js';
@@ -31,7 +31,7 @@ import {
   recordWebhookFired,
   recordWebhookFailure,
 } from './middleware/metrics.js';
-import { CertExpiredError, CertNotFoundError } from './errors.js';
+import { CertExpiredError, CertNotFoundError, TrustChainValidationError } from './errors.js';
 
 // ── Store initialisation ────────────────────────────────────────────────────────
 // Default: mock adapter (zero-config for development and tests)
@@ -383,6 +383,85 @@ export async function handleIncomingMessage(mimeMessage) {
   // Step 1: Parse the AS4 message
   const parsed = await parseAS4Message(mimeMessage);
 
+  // ── Step 1b: Signal message dispatch (ReceiptSignal / ErrorSignal) ──────────
+  // Signal messages carry no UBL payload — dispatch them without UBL pipeline
+  if (parsed.signalType === 'SignalMessage') {
+    const refMsgId = parsed.refMessageId || null;
+
+    // Determine signal subtype from XML content
+    const hasReceipt = /<eb:Receipt[\s\S]*?<\/eb:Receipt>/.test(parsed.rawSoap || '');
+    const hasError = /<eb:Error[\s\S]*?<\/eb:Error>/.test(parsed.rawSoap || '');
+
+    if (hasReceipt) {
+      // ReceiptSignal: update the referenced transaction to receipt_received
+      let txFound = false;
+      if (refMsgId) {
+        try {
+          const tx = await transactionStore.get(refMsgId);
+          if (tx) {
+            tx.status = 'receipt_received';
+            tx.receiptXml = parsed.rawSoap;
+            await transactionStore.save(tx);
+            txFound = true;
+          } else {
+            console.warn(`ReceiptSignal references unknown messageId: ${refMsgId}`);
+          }
+        } catch (err) {
+          console.error('Failed to store ReceiptSignal:', err.message);
+        }
+      }
+      return {
+        messageId: parsed.messageId || refMsgId,
+        status: txFound ? 'signal_received' : 'warning',
+        signalType: 'Receipt',
+        refMessageId: refMsgId,
+      };
+    }
+
+    if (hasError) {
+      // ErrorSignal: extract ebMS error details and update the transaction
+      const ebErrAttrMatch = parsed.rawSoap?.match(/<eb:Error[^>]*\bcode="([^"]*)"[^>]*>/);
+      const ebErrTagMatch = parsed.rawSoap?.match(/<eb:Error[^>]*>([\s\S]*?)<\/eb:Error>/);
+      const ebmsCode = ebErrAttrMatch?.[1] || ebErrTagMatch?.[1] || 'EB:000';
+      const ebErrTextMatch = parsed.rawSoap?.match(/<eb:Description[^>]*>([\s\S]*?)<\/eb:Description>/);
+      const ebmsMessage = ebErrTextMatch?.[1]?.trim() || null;
+
+      let txFound = false;
+      if (refMsgId) {
+        try {
+          const tx = await transactionStore.get(refMsgId);
+          if (tx) {
+            tx.status = 'error';
+            tx.errorMessage = ebmsMessage ? `[${ebmsCode}] ${ebmsMessage}` : `[${ebmsCode}]`;
+            await transactionStore.save(tx);
+            txFound = true;
+          } else {
+            console.warn(`ErrorSignal references unknown messageId: ${refMsgId}`);
+          }
+        } catch (err) {
+          console.error('Failed to store ErrorSignal:', err.message);
+        }
+      }
+      return {
+        messageId: parsed.messageId || refMsgId,
+        status: txFound ? 'signal_received' : 'warning',
+        signalType: 'Error',
+        refMessageId: refMsgId,
+        ebmsCode,
+        ebmsMessage,
+      };
+    }
+
+    // Unknown signal type — log and return gracefully
+    console.warn('Unknown SignalMessage type received:', parsed.rawSoap?.substring(0, 200));
+    return {
+      messageId: parsed.messageId || refMsgId,
+      status: 'warning',
+      signalType: 'Unknown',
+      refMessageId: refMsgId,
+    };
+  }
+
   if (!parsed.payload) {
     throw new Error('No payload found in incoming AS4 message');
   }
@@ -422,10 +501,23 @@ export async function handleIncomingMessage(mimeMessage) {
 
   // Step 3: Verify WS-Security signature (skip in simulation mode)
   if (parsed.rawSoap) {
-    const sigResult = verifyIncomingSignature(parsed.rawSoap, parsed.senderParticipantId);
-    if (!sigResult.valid) {
-      const err = new Error(`Incoming message signature verification failed: ${sigResult.error}`);
-      err.code = 'INVALID_SIGNATURE';
+    try {
+      const sigResult = await verifyIncomingSignature(parsed.rawSoap, parsed.senderParticipantId);
+      if (!sigResult.valid) {
+        const err = new Error(`Incoming message signature verification failed: ${sigResult.error}`);
+        err.code = 'INVALID_SIGNATURE';
+        throw err;
+      }
+    } catch (err) {
+      if (err instanceof TrustChainValidationError) {
+        // Map to AS4 ebMS error code: EB:005 = cert expired, EB:003 = not in PKI
+        const ebmsCode = err.reason === 'expired' ? 'EB:005' : 'EB:003';
+        const ebErr = new Error(`Trust chain validation failed: ${err.message}`);
+        ebErr.code = ebmsCode;
+        ebErr.ebmsReason = err.reason;
+        ebErr.ebmsSignal = 'Error';
+        throw ebErr;
+      }
       throw err;
     }
   }
