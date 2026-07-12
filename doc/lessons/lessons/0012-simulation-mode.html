@@ -65,7 +65,7 @@
   <tr><td>AS4 HTTP POST to receiver AP</td><td>Direct function call into receive pipeline</td></tr>
   <tr><td>PKI signing (WSS)</td><td>Fake signature inserted</td></tr>
   <tr><td>PKI encryption (AS4)</td><td>Payload passed through unencrypted</td></tr>
-  <tr><td>Signed MDN receipt</td><td>Fake MDN with realistic structure</td></tr>
+  <tr><td>Signed MDN receipt</td><td>Send path: fake MDN with <code>(simulated-signature)</code> placeholder. Receive path: real RSA-signed MDN via <code>test/fixtures/keys/sim-signing-key.pem</code> — valid XML-DSig structure with <code>DigestValue</code>, but issued by a test key, not a Peppol PKI.</td></tr>
   <tr><td>Peppol network errors</td><td>Configurable error injection</td></tr>
 </table>
 
@@ -194,14 +194,14 @@
 
 <table>
   <tr><th>Can test ✅</th><th>Cannot test ⚠️</th></tr>
-  <tr><td>Schematron validation logic</td><td>Real PKI signing/verification</td></tr>
-  <tr><td>SBDH assembly and parsing</td><td>Certificate chain validation</td></tr>
-  <tr><td>AS4 message structure (SOAP + MIME)</td><td>Hostname verification against certificates</td></tr>
-  <tr><td>MDN receipt structure</td><td>Real DNS resolution (SML lookup)</td></tr>
-  <tr><td>Error handling (retry logic)</td><td>Network timeout behaviour</td></tr>
-  <tr><td>Transaction storage (mock store)</td><td>Real SMP metadata retrieval</td></tr>
-  <tr><td>Report generation (EUSR/TSR)</td><td>Interoperability with other APs</td></tr>
-  <tr><td>Full send/receive pipeline end-to-end</td><td>Peppol Testbed accreditation</td></tr>
+  <tr><td>Schematron validation logic</td><td>Real PKI certificate chain validation (Peppol PKI CA)</td></tr>
+  <tr><td>SBDH assembly and parsing</td><td>Certificate hostname verification</td></tr>
+  <tr><td>AS4 message structure (SOAP + MIME)</td><td>Real DNS resolution (SML lookup)</td></tr>
+  <tr><td>MDN receipt structure and RSA signing (test key)</td><td>Network timeout behaviour (real TCP)</td></tr>
+  <tr><td>Error handling (retry logic)</td><td>Real SMP metadata retrieval</td></tr>
+  <tr><td>Transaction storage (mock store)</td><td>Interoperability with other accredited APs</td></tr>
+  <tr><td>Report generation (EUSR/TSR)</td><td>Peppol Testbed accreditation</td></tr>
+  <tr><td>Full send/receive pipeline end-to-end</td><td></td></tr>
 </table>
 
 <div class="callout">
@@ -292,8 +292,8 @@
   <tr><th>Topic</th><th>Key point</th></tr>
   <tr><td>Purpose</td><td>Develop and test the full pipeline without PKI certs or network access</td></tr>
   <tr><td>Enabling</td><td><code>npm run start:sim</code> or <code>SIMULATION_MODE=true</code></td></tr>
-  <tr><td>What's real</td><td>Schematron validation, SBDH, AS4 message structure, MDN format, storage</td></tr>
-  <tr><td>What's fake</td><td>Network transport, PKI signing/encryption, SML/SMP lookups</td></tr>
+  <tr><td>What's real</td><td>Schematron validation, SBDH, AS4 message structure, MDN format (receive path signed with test RSA key), storage</td></tr>
+  <tr><td>What's fake</td><td>Network transport, PKI signing/encryption, SML/SMP lookups, send-path MDN signature (placeholder)</td></tr>
   <tr><td>Participant registry</td><td>In-memory map in <code>src/simulator.js</code>, resettable on restart</td></tr>
   <tr><td>CLI tool</td><td><code>node server/simulate.js</code> for inbound, send, register, participants</td></tr>
   <tr><td>Tests</td><td>All Vitest tests use simulation mode — fast, deterministic, CI-friendly</td></tr>
