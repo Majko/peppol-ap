@@ -107,6 +107,15 @@ export function parseUBL(xmlString) {
       countryCode:
         getVal(supplierParty, 'cac:PostalAddress', 'cac:Country', 'cbc:IdentificationCode') || '',
     };
+    // BG-6 Seller Contact
+    const contact = getVal(invoice, 'cac:AccountingSupplierParty', 'cac:Party', 'cac:Contact');
+    if (contact) {
+      result.sellerContact = {
+        name: getVal(contact, 'cbc:Name') || '',
+        telephone: getVal(contact, 'cbc:Telephone') || '',
+        email: getVal(contact, 'cbc:ElectronicMail') || '',
+      };
+    }
   }
 
   // Extract buyer (AccountingCustomerParty)
@@ -142,6 +151,55 @@ export function parseUBL(xmlString) {
       meansCode: getVal(paymentMeans, 'cbc:PaymentMeansCode') || '',
       iban: getVal(paymentMeans, 'cac:PayeeFinancialAccount', 'cbc:ID') || '',
       bic: getVal(paymentMeans, 'cac:PayeeFinancialAccount', 'cac:FinancialInstitutionBranch', 'cbc:ID') || '',
+    };
+    // BG-16 Payment Instructions (extended)
+    const ctAccounts = ensureArray(getVal(paymentMeans, 'cac:CreditTransferAccount'));
+    result.paymentInstructions = {
+      accountID: getVal(paymentMeans, 'cac:PayeeFinancialAccount', 'cbc:ID') || '',
+      beneficiaryName: '',
+      bankID: getVal(paymentMeans, 'cac:PayeeFinancialAccount', 'cac:FinancialInstitutionBranch', 'cbc:ID') || '',
+      bicCode: getVal(paymentMeans, 'cac:PayeeFinancialAccount', 'cac:FinancialInstitutionBranch', 'cbc:ID') || '',
+      creditTransferIBANs: ctAccounts.map(a => getVal(a, 'cbc:ID') || '').filter(Boolean),
+      creditTransferBICs: ctAccounts.map(a => getVal(a, 'cac:FinancialInstitutionBranch', 'cbc:ID') || '').filter(Boolean),
+      creditTransferAmount: 0,
+      creditTransferCurrency: '',
+      cardAccount: getVal(paymentMeans, 'cac:CardAccount', 'cbc:CardAccountID') || '',
+      cardHolderName: getVal(paymentMeans, 'cac:CardAccount', 'cbc:CardHolderName') || '',
+      cardBrand: getVal(paymentMeans, 'cac:CardAccount', 'cbc:CardTypeCode') || '',
+      debitedAccountIBAN: getVal(paymentMeans, 'cac:DebitedAccount', 'cbc:ID') || '',
+      note: getVal(paymentMeans, 'cbc:PaymentNote') || '',
+    };
+  }
+
+  // Extract PaymentTerms (BT-20 Skonto / raw payment terms)
+  const paymentTerms = getVal(invoice, 'cac:PaymentTerms');
+  if (paymentTerms) {
+    result.paymentTermsNote = getVal(paymentTerms, 'cbc:Note') || '';
+  }
+
+  // Extract AdditionalDocumentReference[] (BG-24 attached documents / BT-125)
+  const rawDocRefs = ensureArray(getVal(invoice, 'cac:AdditionalDocumentReference'));
+  result.attachedDocuments = rawDocRefs.map((ref) => ({
+    id: getVal(ref, 'cbc:ID') || '',
+    filename: getVal(ref, 'cac:Attachment', 'cac:ExternalReference', 'cbc:FileName') || '',
+  }));
+
+  // Extract DeliveryTerms/DeliveryAddress (BT-77 city, BT-78 post code)
+  const deliveryAddress = getVal(invoice, 'cac:DeliveryTerms', 'cac:DeliveryAddress');
+  if (deliveryAddress) {
+    result.deliverTo = {
+      cityName: getVal(deliveryAddress, 'cbc:CityName') || '',
+      postalZone: getVal(deliveryAddress, 'cbc:PostalZone') || '',
+    };
+  }
+
+  // Extract SellerTaxRepresentativeParty (BG-11) — checked by DE-R-016
+  const taxRepParty = getVal(invoice, 'cac:TaxRepresentativeParty');
+  if (taxRepParty) {
+    result.sellerTaxRepresentative = {
+      endpointID: getVal(taxRepParty, 'cbc:EndpointID', '#text') || getVal(taxRepParty, 'cbc:EndpointID') || '',
+      endpointSchemeID: getVal(taxRepParty, 'cbc:EndpointID', '@_schemeID') || '',
+      vatID: getVal(taxRepParty, 'cac:PartyTaxScheme', 'cbc:CompanyID') || '',
     };
   }
 
@@ -182,13 +240,20 @@ export function parseUBL(xmlString) {
     const item = getVal(line, 'cac:Item') || {};
     const price = getVal(line, 'cac:Price') || {};
     const taxCategory = getVal(item, 'cac:ClassifiedTaxCategory') || {};
+    const originCountry = getVal(item, 'cac:Country') || {};
+    const itemNameText = getVal(item, 'cbc:Name') || '';
+    const itemDescText = getVal(item, 'cbc:Description') || '';
 
     return {
       id: parseInt(getVal(line, 'cbc:ID') || '0', 10),
       quantity: parseFloat(getVal(line, 'cbc:InvoicedQuantity', '#text') || getVal(line, 'cbc:InvoicedQuantity') || '0'),
       unitCode: getVal(line, 'cbc:InvoicedQuantity', '@_unitCode') || 'C62',
       lineExtensionAmount: parseFloat(getVal(line, 'cbc:LineExtensionAmount', '#text') || getVal(line, 'cbc:LineExtensionAmount') || '0'),
-      itemName: getVal(item, 'cbc:Name') || '',
+      item: {
+        name: itemNameText,
+        description: itemDescText,
+        countryOfOrigin: getVal(originCountry, 'cbc:IdentificationCode') || '',
+      },
       vatCategory: getVal(taxCategory, 'cbc:ID') || '',
       vatRate: parseFloat(getVal(taxCategory, 'cbc:Percent') || '0'),
       priceAmount: parseFloat(getVal(price, 'cbc:PriceAmount', '#text') || getVal(price, 'cbc:PriceAmount') || '0'),

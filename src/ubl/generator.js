@@ -4,18 +4,6 @@
  * Supports Invoice and CreditNote documents
  */
 
-// DE-R-017: Full Peppol BIS Billing 3.0 invoice type code list
-const VALID_INVOICE_TYPE_CODES = new Set([
-  '326', // Partial invoice
-  '380', // Invoice
-  '381', // Credit note
-  '384', // Self-billed invoice
-  '389', // Self-billed credit note
-  '875', // Invoice for bad debt write-off
-  '876', // Credit note for bad debt write-off
-  '877', // Invoice with reduced payment deadline
-]);
-
 /**
  * Escape XML special characters in a string
  */
@@ -42,15 +30,6 @@ function fmt(num) {
  * @throws {Error} if invoiceTypeCode is not a valid Peppol code
  */
 function buildHeader(data, docType) {
-  // Validate InvoiceTypeCode against DE-R-017 codelist
-  if (data.invoiceTypeCode && !VALID_INVOICE_TYPE_CODES.has(data.invoiceTypeCode)) {
-    const validCodes = Array.from(VALID_INVOICE_TYPE_CODES).join(', ');
-    throw new Error(
-      `Invalid InvoiceTypeCode '${data.invoiceTypeCode}'. ` +
-      `Valid Peppol BIS Billing 3.0 codes are: ${validCodes}`
-    );
-  }
-
   return `
   <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
   <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>
@@ -93,6 +72,12 @@ function buildSeller(seller) {
         <cbc:RegistrationName>${esc(seller.legalRegistrationName || seller.name)}</cbc:RegistrationName>
         ${seller.companyID && !seller.vatID ? `<cbc:CompanyID>${esc(seller.companyID)}</cbc:CompanyID>` : ''}
       </cac:PartyLegalEntity>
+      ${seller.contact ? `
+      <cac:Contact>
+        ${seller.contact.name ? `<cbc:Name>${esc(seller.contact.name)}</cbc:Name>` : ''}
+        ${seller.contact.telephone ? `<cbc:Telephone>${esc(seller.contact.telephone)}</cbc:Telephone>` : ''}
+        ${seller.contact.email ? `<cbc:ElectronicMail>${esc(seller.contact.email)}</cbc:ElectronicMail>` : ''}
+      </cac:Contact>` : ''}
     </cac:Party>
   </cac:AccountingSupplierParty>`;
 }
@@ -130,27 +115,94 @@ function buildBuyer(buyer) {
         <cbc:RegistrationName>${esc(buyer.legalRegistrationName || buyer.name)}</cbc:RegistrationName>
         ${buyer.companyID && !buyer.vatID ? `<cbc:CompanyID${companyIDScheme}>${esc(buyer.companyID)}</cbc:CompanyID>` : ''}
       </cac:PartyLegalEntity>
+      ${buyer.contact ? `
+      <cac:Contact>
+        ${buyer.contact.name ? `<cbc:Name>${esc(buyer.contact.name)}</cbc:Name>` : ''}
+        ${buyer.contact.telephone ? `<cbc:Telephone>${esc(buyer.contact.telephone)}</cbc:Telephone>` : ''}
+        ${buyer.contact.email ? `<cbc:ElectronicMail>${esc(buyer.contact.email)}</cbc:ElectronicMail>` : ''}
+      </cac:Contact>` : ''}
     </cac:Party>
   </cac:AccountingCustomerParty>`;
 }
 
 /**
- * Build the payment section
+ * Build the payment section (BG-16 Payment Instructions)
  */
 function buildPayment(payment) {
   if (!payment) return '';
 
-  return `
+  let xml = `
   <cac:PaymentMeans>
-    <cbc:PaymentMeansCode>${esc(payment.meansCode || '30')}</cbc:PaymentMeansCode>
+    <cbc:PaymentMeansCode>${esc(payment.meansCode || '30')}</cbc:PaymentMeansCode>`;
+
+  // BT-82: Payment note
+  if (payment.note) {
+    xml += `
+    <cbc:PaymentNote>${esc(payment.note)}</cbc:PaymentNote>`;
+  }
+
+  // BT-83: Payment account name
+  if (payment.accountName) {
+    xml += `
+    <cbc:PaymentoverteenyAmount currencyID="${esc(payment.currencyCode || 'EUR')}">${fmt(payment.accountName)}</cbc:PaymentoverteenyAmount>`;
+  }
+
+  // BT-84/85: SEPA credit transfer (IBAN + BIC)
+  if (payment.iban) {
+    xml += `
     <cac:PayeeFinancialAccount>
-      <cbc:ID>${esc(payment.iban)}</cbc:ID>
-      ${payment.bic ? `
+      <cbc:ID>${esc(payment.iban)}</cbc:ID>`;
+    if (payment.bic) {
+      xml += `
       <cac:FinancialInstitutionBranch>
         <cbc:ID>${esc(payment.bic)}</cbc:ID>
-      </cac:FinancialInstitutionBranch>` : ''}
-    </cac:PayeeFinancialAccount>
+      </cac:FinancialInstitutionBranch>`;
+    }
+    xml += `
+    </cac:PayeeFinancialAccount>`;
+  }
+
+  // BT-86: Credit transfer IBANs (multi-creditor payments)
+  if (payment.creditTransferIBANs && payment.creditTransferIBANs.length > 0) {
+    for (const iban of payment.creditTransferIBANs) {
+      xml += `
+    <cac:CreditTransferAccount>
+      <cbc:ID>${esc(iban)}</cbc:ID>`;
+      if (payment.creditTransferBICs) {
+        const idx = payment.creditTransferIBANs.indexOf(iban);
+        if (payment.creditTransferBICs[idx]) {
+          xml += `
+      <cac:FinancialInstitutionBranch>
+        <cbc:ID>${esc(payment.creditTransferBICs[idx])}</cbc:ID>
+      </cac:FinancialInstitutionBranch>`;
+        }
+      }
+      xml += `
+    </cac:CreditTransferAccount>`;
+    }
+  }
+
+  // BT-88-91: Card payment details
+  if (payment.cardAccount) {
+    xml += `
+    <cac:CardAccount>
+      <cbc:CardAccountID>${esc(payment.cardAccount)}</cbc:CardAccountID>
+      ${payment.cardHolderName ? `<cbc:CardHolderName>${esc(payment.cardHolderName)}</cbc:CardHolderName>` : ''}
+      ${payment.cardBrand ? `<cbc:CardTypeCode>${esc(payment.cardBrand)}</cbc:CardTypeCode>` : ''}
+    </cac:CardAccount>`;
+  }
+
+  // BT-91: Debited account IBAN
+  if (payment.debitedAccountIBAN) {
+    xml += `
+    <cac:DebitedAccount>
+      <cbc:ID>${esc(payment.debitedAccountIBAN)}</cbc:ID>
+    </cac:DebitedAccount>`;
+  }
+
+  xml += `
   </cac:PaymentMeans>`;
+  return xml;
 }
 
 /**
@@ -219,8 +271,9 @@ function buildLines(lines, currencyCode) {
     <cbc:InvoicedQuantity unitCode="${esc(line.unitCode || 'C62')}">${fmt(line.quantity)}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="${cc}">${fmt(line.lineExtensionAmount)}</cbc:LineExtensionAmount>
     <cac:Item>
-      <cbc:Name>${esc(line.itemName)}</cbc:Name>
-      ${line.originCountry ? `<cac:OriginCountry><cbc:IdentificationCode>${esc(line.originCountry)}</cbc:IdentificationCode></cac:OriginCountry>` : ''}
+      <cbc:Name>${esc(line.item?.name || line.itemName)}</cbc:Name>
+      ${line.item?.description ? `<cbc:Description>${esc(line.item.description)}</cbc:Description>` : ''}
+      ${line.item?.countryOfOrigin ? `<cac:OriginCountry><cbc:IdentificationCode>${esc(line.item.countryOfOrigin)}</cbc:IdentificationCode></cac:OriginCountry>` : ''}
       <cac:ClassifiedTaxCategory>
         <cbc:ID>${esc(line.vatCategory)}</cbc:ID>
         <cbc:Percent>${fmt(line.vatRate)}</cbc:Percent>

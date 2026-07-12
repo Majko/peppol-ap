@@ -282,7 +282,7 @@ describe('Simulation Regression Baseline — Ticket #01', () => {
       const sbdhXml = buildSBDH({
         senderId: '9914:SK2023456789',
         receiverId: '0088:SK4498765432',
-        instanceIdentifier: 'uuid:test-roundtrip@test.ap.local',
+        instanceIdentifier: 'uuid:81a559eb-8444-4890-83de-856b7237aa68@test.ap.local',
         creationDateAndTime: new Date().toISOString(),
         documentType: 'Invoice',
         documentTypeIdentifier:
@@ -293,7 +293,7 @@ describe('Simulation Regression Baseline — Ticket #01', () => {
       });
 
       const mimeMessage = buildAS4Message({
-        messageId: 'uuid:test-roundtrip@test.ap.local',
+        messageId: 'uuid:81a559eb-8444-4890-83de-856b7237aa68@test.ap.local',
         fromApId: 'POP000001',
         toApId: 'POP000999',
         senderParticipantId: '9914:SK2023456789',
@@ -308,7 +308,8 @@ describe('Simulation Regression Baseline — Ticket #01', () => {
       const parsed = await parseAS4Message(mimeMessage);
 
       // Verify all expected fields are extracted
-      expect(parsed.messageId).toBe('uuid:test-roundtrip@test.ap.local');
+      // messageId: buildAS4Message embeds the exact messageId passed in
+      expect(parsed.messageId).toBe('uuid:81a559eb-8444-4890-83de-856b7237aa68@test.ap.local');
       expect(parsed.fromApId).toBe('POP000001');
       expect(parsed.toApId).toBe('POP000999');
       expect(parsed.senderParticipantId).toBe('9914:SK2023456789');
@@ -330,7 +331,7 @@ describe('Simulation Regression Baseline — Ticket #01', () => {
       const sbdhXml = buildSBDH({
         senderId: '9914:SK2023456789',
         receiverId: '0088:SK4498765432',
-        instanceIdentifier: 'uuid:test-base64@test.ap.local',
+        instanceIdentifier: 'uuid:742267dc-754c-495c-98d8-273ffbd53b9e@test.ap.local',
         creationDateAndTime: new Date().toISOString(),
         documentType: 'Invoice',
         documentTypeIdentifier:
@@ -341,7 +342,7 @@ describe('Simulation Regression Baseline — Ticket #01', () => {
       });
 
       const mimeMessage = buildAS4Message({
-        messageId: 'uuid:test-base64@test.ap.local',
+        messageId: 'uuid:742267dc-754c-495c-98d8-273ffbd53b9e@test.ap.local',
         fromApId: 'POP000001',
         toApId: 'POP000999',
         senderParticipantId: '9914:SK2023456789',

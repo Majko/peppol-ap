@@ -22,7 +22,12 @@
         "countryCode": "SK",
         "vatID": "SK2023456789",
         "legalRegistrationName": "Pekáreň Pod Hradom s.r.o.",
-        "companyID": "SK2023456789"
+        "companyID": "SK2023456789",
+        "contact": {
+          "name": "Ján Novák",
+          "telephone": "+42122123456",
+          "email": "jan.novak@pekarna.sk"
+        }
       },
       "buyer": {
         "endpointID": "SK4498765432",
@@ -54,8 +59,8 @@
         "payableAmount": 3219.0
       },
       "lines": [
-        { "id": 1, "quantity": 100, "unitCode": "KGM", "lineExtensionAmount": 2000.0, "itemName": "Ražný chlieb 1kg", "vatCategory": "AA", "vatRate": 10.0, "priceAmount": 20.0 },
-        { "id": 2, "quantity": 5, "unitCode": "DAY", "lineExtensionAmount": 400.0, "itemName": "Catering - obedové menu", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 80.0 }
+        { "id": 1, "quantity": 100, "unitCode": "KGM", "lineExtensionAmount": 2000.0, "item": { "name": "Ražný chlieb 1kg", "description": "", "countryOfOrigin": "" }, "vatCategory": "AA", "vatRate": 10.0, "priceAmount": 20.0 },
+        { "id": 2, "quantity": 5, "unitCode": "DAY", "lineExtensionAmount": 400.0, "item": { "name": "Catering - obedové menu", "description": "", "countryOfOrigin": "" }, "vatCategory": "S", "vatRate": 23.0, "priceAmount": 80.0 }
       ]
     }
   },

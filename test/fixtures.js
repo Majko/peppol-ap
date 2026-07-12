@@ -22,6 +22,11 @@ export const sampleInvoiceData = {
     vatID: 'SK2023456789',
     legalRegistrationName: 'Pekáreň Pod Hradom s.r.o.',
     companyID: 'SK2023456789', // BR-46: SK + 10 digits
+    contact: {
+      name: 'Jana Nováková',
+      telephone: '+421 2 1234 5678',
+      email: 'jana@pekaren.sk',
+    },
   },
 
   buyer: {
@@ -63,7 +68,7 @@ export const sampleInvoiceData = {
       quantity: 100,
       unitCode: 'KGM',
       lineExtensionAmount: 2000.0,
-      itemName: 'Ražný chlieb 1kg',
+      item: { name: 'Ražný chlieb 1kg', description: '', countryOfOrigin: '' },
       vatCategory: 'AA',
       vatRate: 10.0,
       priceAmount: 20.0,
@@ -73,7 +78,7 @@ export const sampleInvoiceData = {
       quantity: 5,
       unitCode: 'DAY',
       lineExtensionAmount: 400.0,
-      itemName: 'Catering - obedové menu',
+      item: { name: 'Catering - obedové menu', description: '', countryOfOrigin: '' },
       vatCategory: 'S',
       vatRate: 23.0,
       priceAmount: 80.0,

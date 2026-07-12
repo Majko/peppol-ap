@@ -10,11 +10,47 @@
       "issueDate": "2026-06-15",
       "invoiceTypeCode": "380",
       "currencyCode": "EUR",
-      "seller": { "endpointID": "SK2023456789", "endpointSchemeID": "iso6523-actorid-upis", "name": "Seller", "cityName": "Bratislava", "countryCode": "SK", "companyID": "SK2023456789" },
-      "buyer": { "endpointID": "SK0000000000", "endpointSchemeID": "0088", "name": "Buyer", "cityName": "Trnava", "countryCode": "SK", "companyID": "SK0000000000" },
+      "buyerReference": "OBJ-2026-0042",
+      "seller": {
+        "endpointID": "SK2023456789",
+        "endpointSchemeID": "iso6523-actorid-upis",
+        "name": "Seller",
+        "streetName": "Hlavná 15",
+        "cityName": "Bratislava",
+        "postalZone": "811 01",
+        "countryCode": "SK",
+        "companyID": "SK2023456789",
+        "contact": {
+          "name": "Ján Novák",
+          "telephone": "+42122123456",
+          "email": "seller@example.sk"
+        }
+      },
+      "buyer": {
+        "endpointID": "SK0000000000",
+        "endpointSchemeID": "0088",
+        "name": "Buyer",
+        "streetName": "Trojičné námestie 1",
+        "cityName": "Trnava",
+        "postalZone": "917 01",
+        "countryCode": "SK",
+        "companyID": "SK0000000000"
+      },
       "vatBreakdown": [
         { "taxableAmount": 100.0, "taxAmount": 23.0, "category": "S", "rate": 23.0 }
       ],
+      "paymentInstructions": {
+        "accountID": "SK1209000000001234567890",
+        "beneficiaryName": "Seller",
+        "bankID": "SLKNSiBA"
+      },
+      "payment": {
+        "meansCode": "30",
+        "accountID": "SK1209000000001234567890",
+        "beneficiaryName": "Seller",
+        "iban": "SK1209000000001234567890",
+        "bankID": "SLKNSiBA"
+      },
       "monetaryTotal": {
         "lineExtensionAmount": 100.0,
         "taxExclusiveAmount": 100.0,
@@ -22,7 +58,7 @@
         "payableAmount": 123.0
       },
       "lines": [
-        { "id": 1, "quantity": 1, "unitCode": "C62", "lineExtensionAmount": 100.0, "itemName": "Item", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 100.0 }
+        { "id": 1, "quantity": 1, "unitCode": "C62", "lineExtensionAmount": 100.0, "item": { "name": "Item", "description": "", "countryOfOrigin": "" }, "vatCategory": "S", "vatRate": 23.0, "priceAmount": 100.0 }
       ]
     }
   },

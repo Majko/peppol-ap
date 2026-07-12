@@ -226,12 +226,12 @@ export function validateUBL(xmlString) {
   }
 
   // Phase 4: Check invoice/credit note type code (DE-R-017)
-  // DE-R-017 is a WARNING in the Peppol spec, not fatal
+  // Fatal: invalid invoice type codes must be rejected by the API
   if (doc.invoiceTypeCode && !VALID_INVOICE_TYPE_CODES.has(doc.invoiceTypeCode)) {
     errors.push(
       makeError(
         'DE-R-017',
-        'warning',
+        'fatal',
         `Invalid InvoiceTypeCode '${doc.invoiceTypeCode}'. Valid Peppol codes: ${Array.from(VALID_INVOICE_TYPE_CODES).join(', ')}`,
         '/Invoice/cbc:InvoiceTypeCode'
       )
@@ -244,7 +244,7 @@ export function validateUBL(xmlString) {
     errors.push(
       makeError(
         'DE-R-017',
-        'warning',
+        'fatal',
         `CreditNote has invalid type code '${doc.invoiceTypeCode}'. Valid credit note codes: ${Array.from(VALID_CREDIT_NOTE_TYPE_CODES).join(', ')}`,
         '/CreditNote/cbc:InvoiceTypeCode'
       )
@@ -440,7 +440,7 @@ export function validateUBL(xmlString) {
       const index = i + 1;
 
       // Check line has a name
-      if (!line.itemName || line.itemName.trim() === '') {
+      if (!line.item?.name || line.item.name.trim() === '') {
         errors.push(
           makeError(
             'R010',
@@ -595,6 +595,368 @@ export function validateUBL(xmlString) {
           )
         );
       }
+    }
+  }
+
+  // ============================================================
+  // Phase 15: DE-R-001 to DE-R-009 — German/Slovak extension rules
+  // BG-16 Payment Instructions, BG-6 Seller Contact, seller/buyer address
+  // ============================================================
+
+  // DE-R-001 (fatal): Payment Instructions (BG-16 / cac:PaymentMeans) must be present
+  if (!doc.payment && !doc.paymentInstructions) {
+    errors.push(
+      makeError(
+        'DE-R-001',
+        'fatal',
+        'Payment Instructions (BG-16) must be present on every invoice',
+        '/Invoice/cac:PaymentMeans'
+      )
+    );
+  }
+
+  // DE-R-002 (fatal): Seller Contact group (BG-6) must be provided
+  if (!doc.sellerContact) {
+    errors.push(
+      makeError(
+        'DE-R-002',
+        'fatal',
+        'Seller Contact (BG-6 / AccountingSupplierParty/Party/cac:Contact) must be provided',
+        '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact'
+      )
+    );
+  }
+
+  // DE-R-003 (fatal): Seller city (BT-37) must be present
+  if (!doc.seller || !doc.seller.cityName || doc.seller.cityName.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-003',
+        'fatal',
+        'Seller city (BT-37 / AccountingSupplierParty/Party/PostalAddress/cbc:CityName) must be present',
+        '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/cbc:CityName'
+      )
+    );
+  }
+
+  // DE-R-004 (fatal): Seller post code (BT-38) must be present
+  if (!doc.seller || !doc.seller.postalZone || doc.seller.postalZone.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-004',
+        'fatal',
+        'Seller post code (BT-38 / AccountingSupplierParty/Party/PostalAddress/cbc:PostalZone) must be present',
+        '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/cbc:PostalZone'
+      )
+    );
+  }
+
+  // DE-R-005 (fatal): Seller contact point (BT-41 / cac:Contact/cbc:Name) must be present
+  if (!doc.sellerContact || !doc.sellerContact.name || doc.sellerContact.name.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-005',
+        'fatal',
+        'Seller contact point (BT-41 / AccountingSupplierParty/Party/cac:Contact/cbc:Name) must be present',
+        '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact/cbc:Name'
+      )
+    );
+  }
+
+  // DE-R-006 (fatal): Seller contact telephone (BT-42 / cac:Contact/cbc:Telephone) must be present
+  if (!doc.sellerContact || !doc.sellerContact.telephone || doc.sellerContact.telephone.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-006',
+        'fatal',
+        'Seller contact telephone (BT-42 / AccountingSupplierParty/Party/cac:Contact/cbc:Telephone) must be present',
+        '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact/cbc:Telephone'
+      )
+    );
+  }
+
+  // DE-R-007 (fatal): Seller contact email (BT-43 / cac:Contact/cbc:ElectronicMail) must be present
+  if (!doc.sellerContact || !doc.sellerContact.email || doc.sellerContact.email.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-007',
+        'fatal',
+        'Seller contact email (BT-43 / AccountingSupplierParty/Party/cac:Contact/cbc:ElectronicMail) must be present',
+        '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:Contact/cbc:ElectronicMail'
+      )
+    );
+  }
+
+  // DE-R-008 (fatal): Buyer city (BT-52) must be present
+  if (!doc.buyer || !doc.buyer.cityName || doc.buyer.cityName.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-008',
+        'fatal',
+        'Buyer city (BT-52 / AccountingCustomerParty/Party/PostalAddress/cbc:CityName) must be present',
+        '/Invoice/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress/cbc:CityName'
+      )
+    );
+  }
+
+  // DE-R-009 (fatal): Buyer post code (BT-53) must be present
+  if (!doc.buyer || !doc.buyer.postalZone || doc.buyer.postalZone.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-009',
+        'fatal',
+        'Buyer post code (BT-53 / AccountingCustomerParty/Party/PostalAddress/cbc:PostalZone) must be present',
+        '/Invoice/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress/cbc:PostalZone'
+      )
+    );
+  }
+
+  // ============================================================
+  // Phase 15: DE-R-010, DE-R-011, DE-R-014 — Deliver-to and VAT rate rules
+  // ============================================================
+
+  // DE-R-010 (fatal): Deliver-to city (BT-77) must be present if DeliverToAddress (BG-15) is present
+  const hasDeliverToAddress = !!(doc.deliverTo && (
+    doc.deliverTo.cityName ||
+    doc.deliverTo.postalZone
+  ));
+  // Presence of BG-15 is inferred: if any deliverTo fields are set, BG-15 is "present"
+  if (hasDeliverToAddress) {
+    if (!doc.deliverTo?.cityName) {
+      errors.push(
+        makeError(
+          'DE-R-010',
+          'fatal',
+          'Deliver-to city (BT-77) must be present when DeliverToAddress (BG-15) is present',
+          '/Invoice/cac:DeliveryTerms/cac:DeliveryAddress/cbc:CityName'
+        )
+      );
+    }
+  }
+
+  // DE-R-011 (fatal): Deliver-to post code (BT-78) must be present if DeliverToAddress (BG-15) is present
+  if (hasDeliverToAddress) {
+    if (!doc.deliverTo?.postalZone) {
+      errors.push(
+        makeError(
+          'DE-R-011',
+          'fatal',
+          'Deliver-to post code (BT-78) must be present when DeliverToAddress (BG-15) is present',
+          '/Invoice/cac:DeliveryTerms/cac:DeliveryAddress/cbc:PostalZone'
+        )
+      );
+    }
+  }
+
+  // DE-R-014 (fatal): VAT category rate (BT-119) must be present on each tax line (TaxSubtotal/TaxCategory/Percent)
+  if (doc.vatBreakdown && doc.vatBreakdown.length > 0) {
+    for (let i = 0; i < doc.vatBreakdown.length; i++) {
+      const vat = doc.vatBreakdown[i];
+      const index = i + 1;
+      if (vat.rate == null || isNaN(vat.rate)) {
+        errors.push(
+          makeError(
+            'DE-R-014',
+            'fatal',
+            `VAT category rate (BT-119) must be present on tax line ${index}`,
+            `/Invoice/cac:TaxTotal/cac:TaxSubtotal[${index}]/cac:TaxCategory/cbc:Percent`
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 16: DE-R-015 — Buyer Reference (BT-10) must be present
+  // ============================================================
+  if (!doc.buyerReference || doc.buyerReference.trim() === '') {
+    errors.push(
+      makeError(
+        'DE-R-015',
+        'fatal',
+        'Buyer Reference (BT-10) must be present on invoices',
+        '/Invoice/cbc:BuyerReference'
+      )
+    );
+  }
+
+  // ============================================================
+  // Phase 17: DE-R-016 — Seller VAT ID presence when VAT category is applicable
+  // When VAT category code is one of S, Z, E, AE, K, G, L, or M, at least one of:
+  // Seller VAT identifier (BT-31), Seller tax registration identifier (BT-32),
+  // or Seller Tax Representative Party (BG-11) must be present
+  // ============================================================
+  const VAT_CATEGORIES_REQUIRING_ID = new Set(['S', 'Z', 'E', 'AE', 'K', 'G', 'L', 'M']);
+  if (doc.vatBreakdown && doc.vatBreakdown.length > 0) {
+    const allCategories = doc.vatBreakdown.map(v => v.category);
+    const hasApplicableCategory = allCategories.some(cat => VAT_CATEGORIES_REQUIRING_ID.has(cat));
+    if (hasApplicableCategory) {
+      const hasSellerVatID = !!(doc.seller?.vatID && doc.seller.vatID.trim() !== '');
+      const hasSellerCompanyID = !!(doc.seller?.companyID && doc.seller.companyID.trim() !== '');
+      const hasTaxRepParty = !!(doc.sellerTaxRepresentative && (
+        doc.sellerTaxRepresentative.vatID ||
+        doc.sellerTaxRepresentative.endpointID
+      ));
+      if (!hasSellerVatID && !hasSellerCompanyID && !hasTaxRepParty) {
+        errors.push(
+          makeError(
+            'DE-R-016',
+            'fatal',
+            'When VAT category is S, Z, E, AE, K, G, L, or M, at least one of Seller VAT ID (BT-31), Seller CompanyID (BT-32), or Seller Tax Representative Party (BG-11) must be present',
+            '/Invoice/cac:AccountingSupplierParty/cac:Party'
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 18: DE-R-018 — Payment Terms / Skonto (BT-20) structured format
+  // Must match: ^#SKONTO#TAGE=\d+#PROZENT=\d{2}\.\d{2}(#BASISBETRAG=\d+\.?\d*)?#\s*$
+  // All uppercase, no extra whitespace, XML line break at end
+  // ============================================================
+  const SKONTO_REGEX = /^#SKONTO#TAGE=\d+#PROZENT=\d{2}\.\d{2}(#BASISBETRAG=\d+\.?\d*)?#\s*$/;
+  if (doc.paymentTermsNote && doc.paymentTermsNote.trim() !== '') {
+    // If the note starts with #SKONTO#, it must be a structured Skonto string
+    if (doc.paymentTermsNote.trim().startsWith('#SKONTO#')) {
+      if (!SKONTO_REGEX.test(doc.paymentTermsNote)) {
+        errors.push(
+          makeError(
+            'DE-R-018',
+            'fatal',
+            `Payment Terms / Skonto (BT-20) must match structured format when present: ${SKONTO_REGEX.toString()}`,
+            '/Invoice/cac:PaymentTerms/cbc:Note'
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 19: DE-R-022 — Attached document filenames (BT-125) uniqueness (case-insensitive)
+  // ============================================================
+  if (doc.attachedDocuments && doc.attachedDocuments.length > 1) {
+    const filenamesLower = doc.attachedDocuments.map(d => (d.filename || '').toLowerCase());
+    const seen = new Set();
+    for (const fn of filenamesLower) {
+      if (fn && seen.has(fn)) {
+        errors.push(
+          makeError(
+            'DE-R-022',
+            'fatal',
+            `Attached document filenames (BT-125) must be unique case-insensitively within the invoice. Duplicate: '${fn}'`,
+            '/Invoice/cac:AdditionalDocumentReference'
+          )
+        );
+        break; // Only report once
+      }
+      if (fn) seen.add(fn);
+    }
+  }
+
+  // ============================================================
+  // Phase 20: DE-R-023 / DE-R-024 — PaymentMeansCode cross-validation with BG-17/BG-18/BG-19
+  // DE-R-023-1 (fatal): If PaymentMeansCode is 30 or 58, BG-17 (CreditTransfer) must be provided
+  // DE-R-023-2 (fatal): If PaymentMeansCode is 30 or 58, BG-18 (PaymentCard) and BG-19 (BankAccount) must NOT be provided
+  // DE-R-024-1 (fatal): If PaymentMeansCode is 48, 54, or 55, BG-18 (PaymentCard) must be provided
+  // DE-R-024-2 (fatal): If PaymentMeansCode is 48, 54, or 55, BG-17 and BG-19 must NOT be provided
+  // ============================================================
+  const meansCode = doc.paymentInstructions?.accountID || doc.payment?.iban ? (doc.payment?.meansCode || '') : '';
+  // Re-extract PaymentMeansCode directly from parsed data (fallback)
+  const pmCode = doc.payment?.meansCode || '';
+
+  // DE-R-023-1 and DE-R-023-2: PaymentMeansCode = 30 or 58
+  if (pmCode === '30' || pmCode === '58') {
+    // BG-17 = CreditTransfer (PayeeFinancialAccount / cac:CreditTransferAccount)
+    const hasCreditTransfer = !!(doc.paymentInstructions &&
+      (doc.paymentInstructions.creditTransferIBANs?.length > 0 || doc.paymentInstructions.accountID));
+    if (!hasCreditTransfer) {
+      errors.push(
+        makeError(
+          'DE-R-023-1',
+          'fatal',
+          'When PaymentMeansCode is 30 or 58, BG-17 (CreditTransfer) must be provided',
+          '/Invoice/cac:PaymentMeans'
+        )
+      );
+    }
+    // BG-18 = CardAccount, BG-19 = BankAccount (PayeeFinancialAccount)
+    const hasCardAccount = !!(doc.paymentInstructions?.cardAccount);
+    const hasBankAccount = !!(doc.payment?.iban); // BG-19 = PayeeFinancialAccount
+    // DE-R-023-2: When PaymentMeansCode is 30 or 58, BG-18 AND BG-19 must NOT be present together
+    // BG-17 may be present (credit transfer). BG-19 and BG-18 together would be a conflict.
+    if (hasCardAccount && hasBankAccount) {
+      errors.push(
+        makeError(
+          'DE-R-023-2',
+          'fatal',
+          'When PaymentMeansCode is 30 or 58, BG-18 (PaymentCard) and BG-19 (BankAccount) must NOT be provided',
+          '/Invoice/cac:PaymentMeans'
+        )
+      );
+    }
+  }
+
+  // DE-R-024-1 and DE-R-024-2: PaymentMeansCode = 48, 54, or 55
+  if (pmCode === '48' || pmCode === '54' || pmCode === '55') {
+    // BG-18 must be provided
+    const hasCardAccount = !!(doc.paymentInstructions?.cardAccount);
+    if (!hasCardAccount) {
+      errors.push(
+        makeError(
+          'DE-R-024-1',
+          'fatal',
+          'When PaymentMeansCode is 48, 54, or 55, BG-18 (PaymentCard) must be provided',
+          '/Invoice/cac:PaymentMeans'
+        )
+      );
+    }
+    // BG-17 and BG-19 must NOT be provided
+    const hasCreditTransfer = !!(doc.paymentInstructions &&
+      (doc.paymentInstructions.creditTransferIBANs?.length > 0 || doc.paymentInstructions.accountID));
+    if (hasCreditTransfer) {
+      errors.push(
+        makeError(
+          'DE-R-024-2',
+          'fatal',
+          'When PaymentMeansCode is 48, 54, or 55, BG-17 (CreditTransfer) and BG-19 (BankAccount) must NOT be provided',
+          '/Invoice/cac:PaymentMeans'
+        )
+      );
+    }
+  }
+
+  // ============================================================
+  // Phase 21: DE-R-019 and DE-R-020 — IBAN validation warnings
+  // DE-R-019 (warning): If PaymentMeansCode is 58 (SEPA), BT-84 (IBAN) should be a valid IBAN
+  // DE-R-020 (warning): If PaymentMeansCode is 59 (SEPA debit), BT-91 (DebitedAccountIBAN) should be a valid IBAN
+  // ============================================================
+  // Simplified IBAN regex (basic structure: 2 letters + 2 digits + up to 30 alphanumeric)
+  const IBAN_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{1,30}$/;
+  if (pmCode === '58' && doc.paymentInstructions?.accountID) {
+    const iban = doc.paymentInstructions.accountID.replace(/\s/g, '');
+    if (!IBAN_REGEX.test(iban)) {
+      errors.push(
+        makeError(
+          'DE-R-019',
+          'warning',
+          `When PaymentMeansCode is 58 (SEPA), BT-84 (IBAN) '${doc.paymentInstructions.accountID}' should be a valid IBAN`,
+          '/Invoice/cac:PaymentMeans/cac:PayeeFinancialAccount/cbc:ID'
+        )
+      );
+    }
+  }
+  if (pmCode === '59' && doc.paymentInstructions?.debitedAccountIBAN) {
+    const iban = doc.paymentInstructions.debitedAccountIBAN.replace(/\s/g, '');
+    if (!IBAN_REGEX.test(iban)) {
+      errors.push(
+        makeError(
+          'DE-R-020',
+          'warning',
+          `When PaymentMeansCode is 59 (SEPA debit), BT-91 (DebitedAccountIBAN) '${doc.paymentInstructions.debitedAccountIBAN}' should be a valid IBAN`,
+          '/Invoice/cac:PaymentMeans/cac:DebitedAccount/cbc:ID'
+        )
+      );
     }
   }
 

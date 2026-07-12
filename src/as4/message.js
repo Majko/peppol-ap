@@ -481,11 +481,13 @@ export async function parseAS4Message(mimeMessage) {
   const msgIdMatch = soapEnvelope.match(/<eb:MessageId>(.*?)<\/eb:MessageId>/);
   if (msgIdMatch) {
     const messageId = msgIdMatch[1];
-    const uuidPattern = /^uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@[\w.-]+$/;
-    if (!uuidPattern.test(messageId)) {
-      const err = new Error(`Invalid MessageId format: ${messageId}`);
-      err.ebms_code = EbMSErrorCodes.EB003_VALUE_FORMAT;
-      throw err;
+    if (result.signalType === 'UserMessage') {
+      const uuidPattern = /^uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@[\w.-]+$/;
+      if (!uuidPattern.test(messageId)) {
+        const err = new Error(`Invalid MessageId format: ${messageId}`);
+        err.ebms_code = EbMSErrorCodes.EB003_VALUE_FORMAT;
+        throw err;
+      }
     }
     result.messageId = messageId;
   }

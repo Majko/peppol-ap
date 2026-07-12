@@ -114,9 +114,9 @@ describe('UBL Generator', () => {
       const parsed = parseUBL(xml);
 
       expect(parsed.lines).toHaveLength(2);
-      expect(parsed.lines[0].itemName).toBe('Ražný chlieb 1kg');
+      expect(parsed.lines[0].item.name).toBe('Ražný chlieb 1kg');
       expect(parsed.lines[0].quantity).toBe(100);
-      expect(parsed.lines[1].itemName).toBe('Catering - obedové menu');
+      expect(parsed.lines[1].item.name).toBe('Catering - obedové menu');
     });
 
     it('should generate parseable XML that round-trips VAT breakdown', () => {

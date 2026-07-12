@@ -20,7 +20,7 @@ const SIM_KEY_PATH = resolve(process.cwd(), 'test/fixtures/keys/sim-signing-key.
 const SIM_CERT_PATH = resolve(process.cwd(), 'test/fixtures/keys/sim-signing-cert.pem');
 const AP_ID = 'POP000123';
 const RECEIVER_AP_ID = 'POP000456';
-const MESSAGE_ID = 'uuid:test-decrypt@ap.mojafaktura.sk';
+const MESSAGE_ID = 'uuid:61e45caa-d4b2-483f-b047-8fb557318ff7@ap.mojafaktura.sk';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
 

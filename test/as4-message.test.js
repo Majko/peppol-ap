@@ -208,7 +208,8 @@ describe('AS4 Message', () => {
       expect(xml).toContain('<eb:Messaging');
       expect(xml).toContain('<eb:SignalMessage>');
       expect(xml).toContain('<eb:Error');
-      expect(xml).toContain('<eb:ErrorCode>EB:001</eb:ErrorCode>');
+      expect(xml).toContain('<eb:Error'); // Error element present
+      expect(xml).toMatch(/<eb:Error[^>]*code="EB:001"[^>]*>/); // code is in attribute
       expect(xml).toContain('<eb:Severity>failure</eb:Severity>');
       expect(xml).toContain('<eb:Description>Test error</eb:Description>');
     });
@@ -240,7 +241,7 @@ describe('AS4 Message', () => {
     it('should produce EB:004 error for unsupported action', () => {
       const xml = buildAS4Error(EbMSErrorCodes.EB004_UNSUPPORTED_ACTION, 'Unsupported document type');
 
-      expect(xml).toContain('<eb:ErrorCode>EB:004</eb:ErrorCode>');
+      expect(xml).toMatch(/<eb:Error[^>]*code="EB:004"[^>]*>/); // code is in attribute
     });
 
     it('should escape XML special characters in message and details', () => {

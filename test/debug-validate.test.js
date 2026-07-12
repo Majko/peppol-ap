@@ -14,6 +14,7 @@ const fixturePayload = {
     name: 'Pekáreň Pod Hradom s.r.o.', streetName: 'Hlavná 15', cityName: 'Bratislava',
     postalZone: '811 01', countryCode: 'SK', vatID: 'SK2023456789',
     legalRegistrationName: 'Pekáreň Pod Hradom s.r.o.', companyID: 'SK2023456789',
+    contact: { name: 'Jana Nováková', telephone: '+421 2 1234 5678', email: 'jana@pekaren.sk' },
   },
   buyer: {
     endpointID: 'SK4498765432', endpointSchemeID: 'iso6523-actorid-upis',

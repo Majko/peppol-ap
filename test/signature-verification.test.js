@@ -16,7 +16,7 @@ const SIM_KEY_PATH = resolve(process.cwd(), 'test/fixtures/keys/sim-signing-key.
 const SIM_CERT_PATH = resolve(process.cwd(), 'test/fixtures/keys/sim-signing-cert.pem');
 const AP_ID = 'POP000123';
 const RECEIVER_AP_ID = 'POP000456';
-const MESSAGE_ID = 'uuid:test-signature@ap.mojafaktura.sk';
+const MESSAGE_ID = 'uuid:84b0d64d-85f1-45d7-bfa1-5fa66af15529@ap.mojafaktura.sk';
 
 function buildTestAS4Message(payload, signingKeyPath = null) {
   return buildAS4Message({
