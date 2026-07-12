@@ -51,7 +51,7 @@ describe('verifyIncomingSignature', () => {
       expect(parsed.rawSoap).toContain('<Signature xmlns=');
 
       // Verify — certificate is extracted from BinarySecurityToken in envelope
-      const result = verifyIncomingSignature(parsed.rawSoap, sampleSBDH.senderId);
+      const result = await verifyIncomingSignature(parsed.rawSoap, sampleSBDH.senderId);
       expect(result.valid).toBe(true);
       expect(result.simulated).toBeFalsy();
     });
@@ -67,13 +67,13 @@ describe('verifyIncomingSignature', () => {
       const { readFileSync } = await import('node:fs');
       const certPem = readFileSync(SIM_CERT_PATH, 'utf8');
 
-      const result = verifyIncomingSignature(parsed.rawSoap, sampleSBDH.senderId, certPem);
+      const result = await verifyIncomingSignature(parsed.rawSoap, sampleSBDH.senderId, certPem);
       expect(result.valid).toBe(true);
     });
   });
 
   describe('invalid signature', () => {
-    it('should fail when no ds:Signature is present', () => {
+    it('should fail when no ds:Signature is present', async () => {
       // Build an unsigned SOAP envelope manually
       const unsignedEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
@@ -97,7 +97,7 @@ describe('verifyIncomingSignature', () => {
   </soap:Body>
 </soap:Envelope>`;
 
-      const result = verifyIncomingSignature(unsignedEnvelope, sampleSBDH.senderId);
+      const result = await verifyIncomingSignature(unsignedEnvelope, sampleSBDH.senderId);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('No Signature found');
     });
@@ -114,7 +114,7 @@ describe('verifyIncomingSignature', () => {
         (_, open, _value, close) => `${open}INVALID_BASE64_SIGNATURE${close}`
       );
 
-      const result = verifyIncomingSignature(tamperedSoap, sampleSBDH.senderId);
+      const result = await verifyIncomingSignature(tamperedSoap, sampleSBDH.senderId);
       expect(result.valid).toBe(false);
       // Either signature verification failed or keyinfo issue
       expect(result.error).toMatch(/signature|keyinfo|KeyInfo/i);
@@ -132,13 +132,13 @@ describe('verifyIncomingSignature', () => {
         (_, prefix, href, suffix) => `${prefix}cid:tampered-payload${suffix}`
       );
 
-      const result = verifyIncomingSignature(tamperedSoap, sampleSBDH.senderId);
+      const result = await verifyIncomingSignature(tamperedSoap, sampleSBDH.senderId);
       expect(result.valid).toBe(false);
     });
   });
 
   describe('simulation mode', () => {
-    it('should bypass verification and return valid=true in simulation mode', () => {
+    it('should bypass verification and return valid=true in simulation mode', async () => {
       apCore.enableSimulation();
 
       // Even an unsigned envelope should pass
@@ -153,7 +153,7 @@ describe('verifyIncomingSignature', () => {
   </soap:Body>
 </soap:Envelope>`;
 
-      const result = verifyIncomingSignature(unsignedEnvelope, sampleSBDH.senderId);
+      const result = await verifyIncomingSignature(unsignedEnvelope, sampleSBDH.senderId);
       expect(result.valid).toBe(true);
       expect(result.simulated).toBe(true);
 
