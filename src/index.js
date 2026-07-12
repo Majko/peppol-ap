@@ -23,6 +23,7 @@ import { decryptPayload, isEncrypted } from './as4/encryption.js';
 import * as node42 from './as4/node42.js';
 import * as simulator from './simulator.js';
 import { createStore } from './store/factory.js';
+import { RetryableError, NonRetryableError, classifySendError } from './errors.js';
 import {
   recordTransaction,
   recordTransactionDuration,
@@ -224,6 +225,32 @@ export async function sendInvoice(params) {
       }
     }
 
+    // Step 5c: Soft-fail CRL/OCSP check (simulation only)
+    // If the certificate has CRL or OCSP endpoints, check them.
+    // Soft-fail: if unavailable, log a warning but allow the send to proceed.
+    if (simulationMode && activeCert.crlUrl) {
+      try {
+        const { simCheckCRL } = await import('./simulation.js');
+        const crlResult = await simCheckCRL(activeCert.crlUrl);
+        if (!crlResult.ok) {
+          console.warn(`[CRL] Check failed for ${activeCert.crlUrl}: ${crlResult.reason}`);
+        }
+      } catch {
+        // soft-fail — allow send to proceed
+      }
+    }
+    if (simulationMode && activeCert.ocspUrl) {
+      try {
+        const { simCheckOCSP } = await import('./simulation.js');
+        const ocspResult = await simCheckOCSP(activeCert.ocspUrl);
+        if (!ocspResult.ok) {
+          console.warn(`[OCSP] Check failed for ${activeCert.ocspUrl}: ${ocspResult.reason}`);
+        }
+      } catch {
+        // soft-fail — allow send to proceed
+      }
+    }
+
     const result = await node42.sendViaNode42(sbdhXml, {
       certPem: activeCert.certPem,
       keyPem: activeCert.privKeyPem,
@@ -288,7 +315,8 @@ export async function sendInvoice(params) {
       };
     }
 
-    // Node42 send failed (network error, HTTP 4xx/5xx, timeout, etc.)
+    // Node42 send failed — classify as retryable or non-retryable
+    const classified = classifySendError(err);
     const tx = {
       messageId,
       direction: 'send',
@@ -311,8 +339,8 @@ export async function sendInvoice(params) {
       status: 'error',
       receipt: null,
       timestamp,
-      error: 'send_failed',
-      details: [{ message: err.message }],
+      error: classified.code,
+      details: [{ message: err.message, retryable: classified instanceof RetryableError }],
     };
   }
 }
@@ -580,6 +608,7 @@ export async function lookupParticipant(participantId) {
 
   if (simulationMode) {
     const result = simulator.simulatedLookup(participantId);
+    validateSMPDates(result);
     // Cache the result (TTL 5 min in simulation)
     await smpCache.set(participantId, result, 300);
     recordSmpLookup('miss');
@@ -591,6 +620,7 @@ export async function lookupParticipant(participantId) {
     const result = await node42.lookupParticipant(participantId, {
       env: config.mode,
     });
+    validateSMPDates(result);
     // Cache result (TTL 10 min in production)
     await smpCache.set(participantId, result, 600);
     recordSmpLookup('miss');
@@ -598,6 +628,40 @@ export async function lookupParticipant(participantId) {
   } catch (err) {
     recordSmpLookup('error');
     throw err;
+  }
+}
+
+/**
+ * Validate SMP ServiceActivationDate and ServiceExpirationDate.
+ * Throws NonRetryableError if the participant's SMP entry is not yet active
+ * or has expired.
+ * @param {{ ServiceActivationDate?: string, ServiceExpirationDate?: string, participantId: string }} smpResult
+ */
+function validateSMPDates(smpResult) {
+  const now = new Date();
+
+  if (smpResult.ServiceActivationDate) {
+    const activationDate = new Date(smpResult.ServiceActivationDate);
+    if (now < activationDate) {
+      const err = new NonRetryableError(
+        `Participant ${smpResult.participantId} SMP entry is not yet active (ServiceActivationDate: ${smpResult.ServiceActivationDate})`,
+        'SMP_NOT_ACTIVE'
+      );
+      console.warn(`[SMP] ${err.message}`);
+      throw err;
+    }
+  }
+
+  if (smpResult.ServiceExpirationDate) {
+    const expirationDate = new Date(smpResult.ServiceExpirationDate);
+    if (now > expirationDate) {
+      const err = new NonRetryableError(
+        `Participant ${smpResult.participantId} SMP entry has expired (ServiceExpirationDate: ${smpResult.ServiceExpirationDate})`,
+        'SMP_EXPIRED'
+      );
+      console.warn(`[SMP] ${err.message}`);
+      throw err;
+    }
   }
 }
 
@@ -685,6 +749,7 @@ export function buildCompleteAS4Message({
     documentType,
     processId,
     timestamp,
+    signingKeyPath: simulationMode ? getSimSigningKeyPath() : undefined,
   });
 
   return { as4Message, sbdhXml, ublXml, messageId };

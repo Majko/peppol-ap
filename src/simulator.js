@@ -19,7 +19,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { signXml } from './as4/message.js';
+import { signXml, getSimSigningKeyPath } from './as4/message.js';
 
 // ═══════════════════════════════════════════════════════
 //  Participant Registry (simulated SMP)
@@ -32,6 +32,11 @@ const participants = new Map();
  */
 export function registerParticipant(id, info = {}) {
   const [scheme, value] = id.includes(':') ? id.split(/:(.+)/) : ['9914', id];
+  const now = new Date();
+  const past = new Date(now);
+  past.setFullYear(past.getFullYear() - 1);
+  const future = new Date(now);
+  future.setFullYear(future.getFullYear() + 10);
   participants.set(id, {
     id,
     scheme,
@@ -41,6 +46,9 @@ export function registerParticipant(id, info = {}) {
     acceptsInvoices: info.acceptsInvoices !== false,
     acceptsCreditNotes: info.acceptsCreditNotes !== false,
     registeredAt: new Date().toISOString(),
+    // SMP date fields (always valid for simulation participants)
+    ServiceActivationDate: info.ServiceActivationDate || past.toISOString(),
+    ServiceExpirationDate: info.ServiceExpirationDate || future.toISOString(),
   });
   return id;
 }
@@ -187,6 +195,7 @@ export async function buildInboundAS4Message({ senderId, receiverId, ublXml, sen
     documentType,
     processId: 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0',
     timestamp,
+    signingKeyPath: getSimSigningKeyPath(),
   });
 
   return { as4Message, sbdhXml, messageId, timestamp };
@@ -214,9 +223,14 @@ export function simulatedLookup(participantId) {
   // participants — this avoids requiring pre-registration for every test party.
   if (!participant) {
     const parts = participantId.split(':');
+    const now = new Date();
+    const past = new Date(now); past.setFullYear(now.getFullYear() - 1);
+    const future = new Date(now); future.setFullYear(now.getFullYear() + 10);
     return {
       participantId,
       smpUrl: `https://smp.${parts[1] || 'unknown'}.sim.local`,
+      ServiceActivationDate: past.toISOString(),
+      ServiceExpirationDate: future.toISOString(),
       services: [
         {
           document_type:
@@ -234,6 +248,8 @@ export function simulatedLookup(participantId) {
   return {
     participantId,
     smpUrl: `https://smp.${participant.value?.toLowerCase?.() || 'unknown'}.sim.local`,
+    ServiceActivationDate: participant.ServiceActivationDate,
+    ServiceExpirationDate: participant.ServiceExpirationDate,
     services: [
       {
         document_type:

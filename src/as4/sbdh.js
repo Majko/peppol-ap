@@ -48,7 +48,7 @@ export function buildSBDH(params) {
     ublXml,
   } = params;
 
-  // Split sender/receiver into scheme and value
+  // Split sender/receiver into scheme and value (trimmed + canonicalised)
   const [senderScheme, senderValue] = splitParticipantID(senderId);
   const [receiverScheme, receiverValue] = splitParticipantID(receiverId);
 
@@ -59,10 +59,10 @@ export function buildSBDH(params) {
   <StandardBusinessDocumentHeader>
     <HeaderVersion>1.0</HeaderVersion>
     <Sender>
-      <Identifier Authority="iso6523-actorid-upis">${esc(senderId)}</Identifier>
+      <Identifier Authority="iso6523-actorid-upis">${esc(senderValue)}</Identifier>
     </Sender>
     <Receiver>
-      <Identifier Authority="iso6523-actorid-upis">${esc(receiverId)}</Identifier>
+      <Identifier Authority="iso6523-actorid-upis">${esc(receiverValue)}</Identifier>
     </Receiver>
     <DocumentIdentification>
       <Standard>${esc(standard)}</Standard>
@@ -84,7 +84,7 @@ export function buildSBDH(params) {
       </Scope>
       <Scope>
         <Type>COUNTRY_C1</Type>
-        <InstanceIdentifier>${esc(countryC1)}</InstanceIdentifier>
+        <InstanceIdentifier>${esc((countryC1 || 'SK').toUpperCase())}</InstanceIdentifier>
       </Scope>
     </BusinessScope>
   </StandardBusinessDocumentHeader>
@@ -118,9 +118,9 @@ export function parseSBDH(xmlString) {
   const sender = getVal(sbdh, 'Sender', 'Identifier', '#text') ||
                  getVal(sbdh, 'Sender', 'Identifier');
   if (sender) {
-    result.senderId = sender;
-    // Try to extract the Authority
+    // Reconstruct the full participant ID from Authority + value
     const auth = getVal(sbdh, 'Sender', 'Identifier', '@_Authority');
+    result.senderId = reconstructParticipantId(auth, sender);
     result.senderAuthority = auth;
   }
 
@@ -128,8 +128,8 @@ export function parseSBDH(xmlString) {
   const receiver = getVal(sbdh, 'Receiver', 'Identifier', '#text') ||
                    getVal(sbdh, 'Receiver', 'Identifier');
   if (receiver) {
-    result.receiverId = receiver;
     const auth = getVal(sbdh, 'Receiver', 'Identifier', '@_Authority');
+    result.receiverId = reconstructParticipantId(auth, receiver);
     result.receiverAuthority = auth;
   }
 
@@ -178,14 +178,40 @@ export function wrapInSBDH(sbdhParams, ublXml) {
 }
 
 /**
+ * Reconstruct a full participant ID from Authority scheme + value.
+ * Canonicalises: uppercase, dashes→underscores for iso6523-actorid-upis.
+ */
+function reconstructParticipantId(auth, value) {
+  if (!auth) return value || '';
+  // Canonicalise: uppercase + dashes to underscores
+  const canonical = auth.toUpperCase().replace(/-/g, '_');
+  return `${canonical}:${value || ''}`;
+}
+
+/**
  * Split a participant ID like "9914:SK2023456789" into scheme and value
  */
 function splitParticipantID(id) {
-  if (!id || !id.includes(':')) {
-    return ['iso6523-actorid-upis', id || ''];
+  if (!id) return ['iso6523-actorid-upis', ''];
+
+  // Trim whitespace from the full ID first
+  const trimmed = id.trim();
+
+  if (!trimmed.includes(':')) {
+    return ['iso6523-actorid-upis', trimmed];
   }
-  const colonIndex = id.indexOf(':');
-  return [id.substring(0, colonIndex), id.substring(colonIndex + 1)];
+  const colonIndex = trimmed.indexOf(':');
+  let scheme = trimmed.substring(0, colonIndex);
+  let value = trimmed.substring(colonIndex + 1);
+
+  // Canonicalise iso6523-actorid-upis: uppercase scheme, strip leading zeros from value
+  if (scheme === 'iso6523-actorid-upis') {
+    scheme = scheme.toUpperCase();
+    // Remove leading zeros from the numeric part of the participant ID
+    value = value.replace(/^0+/, '') || '0';
+  }
+
+  return [scheme, value];
 }
 
 /**

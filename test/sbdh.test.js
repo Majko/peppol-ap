@@ -24,8 +24,9 @@ describe('SBDH', () => {
     it('should include sender and receiver identifiers', () => {
       const xml = buildSBDH(sampleSBDH);
 
-      expect(xml).toContain('9914:SK2023456789');
-      expect(xml).toContain('9914:SK4498765432');
+      // Sender/receiver in SBDH use the value only (scheme is in Authority attribute)
+      expect(xml).toContain('SK2023456789');
+      expect(xml).toContain('SK4498765432');
       expect(xml).toContain('iso6523-actorid-upis');
     });
 
@@ -74,8 +75,9 @@ describe('SBDH', () => {
       const xml = buildSBDH(sampleSBDH);
       const parsed = parseSBDH(xml);
 
-      expect(parsed.senderId).toBe('9914:SK2023456789');
-      expect(parsed.receiverId).toBe('9914:SK4498765432');
+      // parseSBDH returns the canonical form: uppercase scheme with underscores
+      expect(parsed.senderId).toBe('ISO6523_ACTORID_UPIS:SK2023456789');
+      expect(parsed.receiverId).toBe('ISO6523_ACTORID_UPIS:SK4498765432');
     });
 
     it('should parse document identification fields', () => {
@@ -115,8 +117,9 @@ describe('SBDH', () => {
       // Now re-extract - the SBDH won't have an invoice payload in it
       // but we should still get the headers back
       const parsed = parseSBDH(xml);
-      expect(parsed.senderId).toBe(sampleSBDH.senderId);
-      expect(parsed.receiverId).toBe(sampleSBDH.receiverId);
+      // parseSBDH reconstructs the canonical form from the XML (uppercase scheme, underscores)
+      expect(parsed.senderId).toBe('ISO6523_ACTORID_UPIS:SK2023456789');
+      expect(parsed.receiverId).toBe('ISO6523_ACTORID_UPIS:SK4498765432');
     });
   });
 });
