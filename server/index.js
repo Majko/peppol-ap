@@ -307,6 +307,14 @@ export function createApp() {
     }
   });
 
+  // ─── GET /as4/receive ─────────────────────────────────────────────────────────
+  // AS4 receive endpoint only accepts POST; return 405 for any other method.
+
+  app.get('/as4/receive', (_req, res) => {
+    res.set('Allow', 'POST');
+    res.status(405).type('text/plain').send('Method Not Allowed');
+  });
+
   // ─── POST /as4/receive ────────────────────────────────────────────────────────
   // Official AS4 receive endpoint — receives raw MIME multipart body and
   // returns an AS4 MDN receipt (application/xop+xml) on success.
@@ -347,6 +355,26 @@ export function createApp() {
           errorCode = EbMSErrorCodes.EB005_CERT_EXPIRED;
         }
 
+        // Map ebMS error codes to HTTP status codes
+        let httpStatus = 500;
+        switch (errorCode) {
+          case EbMSErrorCodes.EB001_MESSAGE_STRUCTURE:
+          case EbMSErrorCodes.EB002_REQUIRED_FIELD_MISSING:
+            httpStatus = 400;
+            break;
+          case EbMSErrorCodes.EB003_VALUE_FORMAT:
+          case EbMSErrorCodes.EB004_UNSUPPORTED_ACTION:
+          case EbMSErrorCodes.EB006_DECRYPTION_ERROR:
+            httpStatus = 422;
+            break;
+          case EbMSErrorCodes.EB005_CERT_EXPIRED:
+          case EbMSErrorCodes.EB007_SIGNATURE_FAILED:
+            httpStatus = 403;
+            break;
+          default:
+            httpStatus = 500;
+        }
+
         const errorSignal = buildAS4Error(
           errorCode,
           err.message,
@@ -354,7 +382,7 @@ export function createApp() {
           null // refMessageId not available when parse fails
         );
         res.set('Content-Type', 'application/xop+xml');
-        res.status(500).send(errorSignal);
+        res.status(httpStatus).send(errorSignal);
       }
     }
   );
