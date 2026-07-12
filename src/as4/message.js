@@ -324,7 +324,7 @@ export function buildAS4Message(params) {
                xmlns:xop="http://www.w3.org/2004/08/xop/include"
                xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
   <soap:Header>
-    <eb:Messaging>
+    <eb:Messaging soap:mustUnderstand="true">
       <eb:UserMessage>
         <eb:MessageInfo>
           <eb:Timestamp>${esc(timestamp)}</eb:Timestamp>
@@ -562,7 +562,7 @@ export function buildAS4Error(code, message, details = null, refMessageId = null
                xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
                xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
   <soap:Header>
-    <eb:Messaging>
+    <eb:Messaging soap:mustUnderstand="true">
       <eb:SignalMessage>
         <eb:MessageInfo>
           <eb:Timestamp>${esc(timestamp)}</eb:Timestamp>

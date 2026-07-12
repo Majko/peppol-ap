@@ -184,8 +184,9 @@ function buildMonetaryTotal(mt) {
 /**
  * Build invoice lines section
  */
-function buildLines(lines) {
+function buildLines(lines, currencyCode) {
   if (!lines || lines.length === 0) return '';
+  const cc = currencyCode || 'EUR';
 
   let xml = '';
 
@@ -194,7 +195,7 @@ function buildLines(lines) {
   <cac:InvoiceLine>
     <cbc:ID>${esc(String(line.id))}</cbc:ID>
     <cbc:InvoicedQuantity unitCode="${esc(line.unitCode || 'C62')}">${fmt(line.quantity)}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="EUR">${fmt(line.lineExtensionAmount)}</cbc:LineExtensionAmount>
+    <cbc:LineExtensionAmount currencyID="${cc}">${fmt(line.lineExtensionAmount)}</cbc:LineExtensionAmount>
     <cac:Item>
       <cbc:Name>${esc(line.itemName)}</cbc:Name>
       ${line.originCountry ? `<cac:OriginCountry><cbc:IdentificationCode>${esc(line.originCountry)}</cbc:IdentificationCode></cac:OriginCountry>` : ''}
@@ -207,7 +208,7 @@ function buildLines(lines) {
       </cac:ClassifiedTaxCategory>
     </cac:Item>
     <cac:Price>
-      <cbc:PriceAmount currencyID="EUR">${fmt(line.priceAmount)}</cbc:PriceAmount>
+      <cbc:PriceAmount currencyID="${cc}">${fmt(line.priceAmount)}</cbc:PriceAmount>
     </cac:Price>
   </cac:InvoiceLine>`;
   }
@@ -228,7 +229,7 @@ function buildDocument(data, docType) {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <${rootTag} xmlns="${ns}"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">${buildHeader(data, docType)}${buildSeller(data.seller)}${buildBuyer(data.buyer)}${buildPayment(data.payment)}${buildVAT(data.vatBreakdown)}${buildMonetaryTotal(data.monetaryTotal)}${buildLines(data.lines)}
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">${buildHeader(data, docType)}${buildSeller(data.seller)}${buildBuyer(data.buyer)}${buildPayment(data.payment)}${buildVAT(data.vatBreakdown, data.currencyCode)}${buildMonetaryTotal(data.monetaryTotal, data.currencyCode)}${buildLines(data.lines, data.currencyCode)}
 </${rootTag}>`;
 
   return xml;
