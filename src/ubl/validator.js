@@ -43,6 +43,19 @@ const VALID_CURRENCY_CODES = new Set([
   'DKK', 'HRK', 'RON', 'BGN', 'ISK',
 ]);
 
+// Peppol BIS Billing 3.0 ProfileID — must be exact match
+const EXPECTED_PROFILE_ID = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
+
+// Allowed EndpointID schemeID values
+const VALID_ENDPOINT_SCHEME_IDS = new Set([
+  'iso6523-actorid-upis',
+  '0088',
+  '0002',
+]);
+
+// SK VAT ID pattern: SK followed by exactly 10 digits
+const SK_VAT_ID_REGEX = /^SK\d{10}$/;
+
 /**
  * Create a validation error entry
  */
@@ -140,6 +153,65 @@ export function validateUBL(xmlString) {
         '/Invoice/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID'
       )
     );
+  }
+
+  // Phase 3d: Validate seller EndpointID schemeID
+  if (doc.seller && doc.seller.endpointSchemeID) {
+    if (!VALID_ENDPOINT_SCHEME_IDS.has(doc.seller.endpointSchemeID)) {
+      errors.push(
+        makeError(
+          'R001',
+          'fatal',
+          `Invalid seller EndpointID schemeID '${doc.seller.endpointSchemeID}'. Allowed: ${Array.from(VALID_ENDPOINT_SCHEME_IDS).join(', ')}`,
+          '/Invoice/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID'
+        )
+      );
+    }
+  }
+
+  // Phase 3e: Validate buyer EndpointID schemeID
+  if (doc.buyer && doc.buyer.endpointSchemeID) {
+    if (!VALID_ENDPOINT_SCHEME_IDS.has(doc.buyer.endpointSchemeID)) {
+      errors.push(
+        makeError(
+          'R001',
+          'fatal',
+          `Invalid buyer EndpointID schemeID '${doc.buyer.endpointSchemeID}'. Allowed: ${Array.from(VALID_ENDPOINT_SCHEME_IDS).join(', ')}`,
+          '/Invoice/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID'
+        )
+      );
+    }
+  }
+
+  // Phase 3b: Validate ProfileID value (exact match)
+  if (doc.profileID && doc.profileID.trim() !== EXPECTED_PROFILE_ID) {
+    errors.push(
+      makeError(
+        'R001',
+        'fatal',
+        `Invalid ProfileID. Expected: ${EXPECTED_PROFILE_ID}`,
+        '/Invoice/cbc:ProfileID'
+      )
+    );
+  }
+
+  // Phase 3c: Validate date formats (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  for (const { value, name, xpath } of [
+    { value: doc.issueDate, name: 'IssueDate', xpath: '/Invoice/cbc:IssueDate' },
+    { value: doc.dueDate, name: 'DueDate', xpath: '/Invoice/cbc:DueDate' },
+    { value: doc.taxPointDate, name: 'TaxPointDate', xpath: '/Invoice/cbc:TaxPointDate' },
+  ]) {
+    if (value && value.trim() !== '' && !dateRegex.test(value.trim())) {
+      errors.push(
+        makeError(
+          'R001',
+          'fatal',
+          `Invalid date format for ${name}. Expected YYYY-MM-DD, got: ${value}`,
+          xpath
+        )
+      );
+    }
   }
 
   // Phase 4: Check invoice type code (R003)
@@ -385,6 +457,113 @@ export function validateUBL(xmlString) {
             'warning',
             `unitCode '${line.unitCode}' is not in UN/ECE Rec 20 list`,
             `/Invoice/cac:InvoiceLine[${index}]/cbc:InvoicedQuantity`
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 11: Ticket 20 - Monetary totals non-negativity (BR-CO-03)
+  // LineExtensionAmount, TaxExclusiveAmount, TaxInclusiveAmount must each be >= 0
+  // ============================================================
+  if (doc.monetaryTotal) {
+    const mt = doc.monetaryTotal;
+    const monetaryFields = [
+      { value: mt.lineExtensionAmount, name: 'LineExtensionAmount', xpath: '/Invoice/cac:LegalMonetaryTotal/cbc:LineExtensionAmount' },
+      { value: mt.taxExclusiveAmount, name: 'TaxExclusiveAmount', xpath: '/Invoice/cac:LegalMonetaryTotal/cbc:TaxExclusiveAmount' },
+      { value: mt.taxInclusiveAmount, name: 'TaxInclusiveAmount', xpath: '/Invoice/cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount' },
+    ];
+    for (const field of monetaryFields) {
+      if (field.value != null && field.value < 0) {
+        errors.push(
+          makeError(
+            'BR-03',
+            'fatal',
+            `Monetary total '${field.name}' must be >= 0, got ${field.value}`,
+            field.xpath
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 12: Ticket 20 - Tax exemption reason / reason code pairing (BR-44)
+  // Both TaxExemptionReason AND TaxExemptionReasonCode must be present, or neither
+  // ============================================================
+  if (doc.vatBreakdown && doc.vatBreakdown.length > 0) {
+    for (let i = 0; i < doc.vatBreakdown.length; i++) {
+      const vat = doc.vatBreakdown[i];
+      const index = i + 1;
+      const hasReason = !!(vat.taxExemptionReason && vat.taxExemptionReason.trim() !== '');
+      const hasReasonCode = !!(vat.taxExemptionReasonCode && vat.taxExemptionReasonCode.trim() !== '');
+      if (hasReason !== hasReasonCode) {
+        errors.push(
+          makeError(
+            'BR-44',
+            'fatal',
+            `TaxSubtotal[${index}] TaxExemptionReason and TaxExemptionReasonCode must both be present or both absent`,
+            `/Invoice/cac:TaxTotal/cac:TaxSubtotal[${index}]/cac:TaxCategory`
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 13: Ticket 20 - TaxableAmount non-negativity (BR-45)
+  // TaxTotal/TaxSubtotal/TaxableAmount must be >= 0
+  // ============================================================
+  if (doc.vatBreakdown && doc.vatBreakdown.length > 0) {
+    for (let i = 0; i < doc.vatBreakdown.length; i++) {
+      const vat = doc.vatBreakdown[i];
+      const index = i + 1;
+      if (vat.taxableAmount != null && vat.taxableAmount < 0) {
+        errors.push(
+          makeError(
+            'BR-45',
+            'fatal',
+            `TaxSubtotal[${index}] TaxableAmount must be >= 0, got ${vat.taxableAmount}`,
+            `/Invoice/cac:TaxTotal/cac:TaxSubtotal[${index}]/cbc:TaxableAmount`
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 14: Ticket 20 - SK VAT ID format (BR-46)
+  // When sender or receiver country is SK, CompanyID must match ^SK\d{10}$
+  // Applies to AccountingSupplierParty and AccountingCustomerParty PartyTaxScheme/CompanyID
+  // ============================================================
+  const sellerCountry = doc.seller?.countryCode || '';
+  const buyerCountry = doc.buyer?.countryCode || '';
+  const isSKTransaction = sellerCountry === 'SK' || buyerCountry === 'SK';
+
+  if (isSKTransaction) {
+    // Check seller VAT ID (PartyTaxScheme/CompanyID)
+    if (doc.seller?.vatID) {
+      if (!SK_VAT_ID_REGEX.test(doc.seller.vatID)) {
+        errors.push(
+          makeError(
+            'BR-46',
+            'fatal',
+            `Seller VAT ID '${doc.seller.vatID}' does not match SK VAT ID format (expected SK + 10 digits)`,
+            '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'
+          )
+        );
+      }
+    }
+    // Check buyer VAT ID (PartyTaxScheme/CompanyID)
+    if (doc.buyer?.vatID) {
+      if (!SK_VAT_ID_REGEX.test(doc.buyer.vatID)) {
+        errors.push(
+          makeError(
+            'BR-46',
+            'fatal',
+            `Buyer VAT ID '${doc.buyer.vatID}' does not match SK VAT ID format (expected SK + 10 digits)`,
+            '/Invoice/cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'
           )
         );
       }
