@@ -579,7 +579,7 @@ export async function handleIncomingMessage(mimeMessage) {
         }
       }
     } catch (err) {
-      console.error('MDN signing failed (production):', err.message);
+      throw new NonRetryableError('MDN signing failed: ' + err.message);
     }
   }
 
