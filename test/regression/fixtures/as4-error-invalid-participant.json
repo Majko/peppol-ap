@@ -22,7 +22,7 @@
         "companyID": "SK2023456789",
         "contact": {
           "name": "Ján Novák",
-          "telephone": "+42122123456",
+          "telephone": "+421****3456",
           "email": "seller@example.sk"
         }
       },
@@ -42,14 +42,15 @@
       "paymentInstructions": {
         "accountID": "SK1209000000001234567890",
         "beneficiaryName": "Seller",
-        "bankID": "SLKNSiBA"
+        "bankID": "SLKNSKBA",
+        "bicCode": "SLKNSKBA"
       },
       "payment": {
         "meansCode": "30",
         "accountID": "SK1209000000001234567890",
         "beneficiaryName": "Seller",
         "iban": "SK1209000000001234567890",
-        "bankID": "SLKNSiBA"
+        "bic": "SLKNSKBA"
       },
       "monetaryTotal": {
         "lineExtensionAmount": 100.0,
@@ -57,6 +58,8 @@
         "taxInclusiveAmount": 123.0,
         "payableAmount": 123.0
       },
+      "dueDate": "2026-06-30",
+      "paymentTermsNote": "Payment due within 14 days",
       "lines": [
         { "id": 1, "quantity": 1, "unitCode": "C62", "lineExtensionAmount": 100.0, "item": { "name": "Item", "description": "", "countryOfOrigin": "" }, "vatCategory": "S", "vatRate": 23.0, "priceAmount": 100.0 }
       ]

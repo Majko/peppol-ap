@@ -75,6 +75,10 @@ export function parseUBL(xmlString) {
     customizationID: getVal(invoice, 'cbc:CustomizationID') || '',
     profileID: getVal(invoice, 'cbc:ProfileID') || '',
     isCreditNote,
+    // R008: BillingReference for corrected invoices (InvoiceTypeCode=384)
+    billingReference: getVal(invoice, 'cac:BillingReference', 'cac:InvoiceDocumentReference', 'cbc:ID') || '',
+    // R042: Delivery date for K-category (intra-community supply) invoices
+    deliveryDate: getVal(invoice, 'cac:Delivery', 'cbc:ActualDeliveryDate') || '',
   };
 
   // Extract InvoicePeriod if present
@@ -85,6 +89,15 @@ export function parseUBL(xmlString) {
       endDate: getVal(invoicePeriod, 'cbc:EndDate') || '',
     };
   }
+
+  // R055: Extract document-level allowances and charges (BG-20 / BG-21)
+  const rawAllowanceCharges = ensureArray(getVal(invoice, 'cac:AllowanceCharge'));
+  result.allowanceCharges = rawAllowanceCharges.map(ac => ({
+    chargeIndicator: getVal(ac, 'cbc:ChargeIndicator') === 'true',
+    amount: parseFloat(getVal(ac, 'cbc:Amount') || '0'),
+    reason: getVal(ac, 'cbc:Note') || getVal(ac, 'cbc:Reason') || '',
+    category: getVal(ac, 'cac:TaxCategory', 'cbc:ID') || '',
+  }));
 
   // Extract seller (AccountingSupplierParty)
   const supplierParty = getVal(invoice, 'cac:AccountingSupplierParty', 'cac:Party');

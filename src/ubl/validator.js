@@ -12,7 +12,9 @@ const VALID_INVOICE_TYPE_CODES = new Set([
   '326', // Partial invoice
   '380', // Invoice
   '381', // Credit note
+  '383', // Corrected invoice
   '384', // Self-billed invoice
+  '386', // Prepayment invoice
   '389', // Self-billed credit note
   '875', // Invoice for bad debt write-off
   '876', // Credit note for bad debt write-off
@@ -955,6 +957,164 @@ export function validateUBL(xmlString) {
           'warning',
           `When PaymentMeansCode is 59 (SEPA debit), BT-91 (DebitedAccountIBAN) '${doc.paymentInstructions.debitedAccountIBAN}' should be a valid IBAN`,
           '/Invoice/cac:PaymentMeans/cac:DebitedAccount/cbc:ID'
+        )
+      );
+    }
+  }
+
+  // ============================================================
+  // Phase 22: PEPPOL-EN16931-R008 — Corrected invoice needs BillingReference
+  // When InvoiceTypeCode is 384 (self-billed), a BillingReference to the
+  // original invoice must be present.
+  // For Peppol BIS 3.0, we apply this to type 384 and also 383 (corrected).
+  // ============================================================
+  if ((doc.invoiceTypeCode === '384' || doc.invoiceTypeCode === '383') && !doc.billingReference) {
+    errors.push(
+      makeError(
+        'R008',
+        'fatal',
+        `Invoice type '${doc.invoiceTypeCode}' (corrected/self-billed) requires a BillingReference to the original invoice`,
+        '/Invoice/cac:BillingReference'
+      )
+    );
+  }
+
+  // ============================================================
+  // Phase 22: PEPPOL-EN16931-R020 — Due date or payment terms when payable > 0
+  // When PayableAmount > 0, either DueDate (BT-9) or PaymentTerms/Note (BT-20)
+  // must be present.
+  // ============================================================
+  if (doc.monetaryTotal?.payableAmount > 0) {
+    const hasDueDate = !!(doc.dueDate && doc.dueDate.trim() !== '');
+    const hasPaymentTerms = !!(doc.paymentTermsNote && doc.paymentTermsNote.trim() !== '');
+    if (!hasDueDate && !hasPaymentTerms) {
+      errors.push(
+        makeError(
+          'R020',
+          'fatal',
+          `PayableAmount is ${doc.monetaryTotal.payableAmount} (> 0): either DueDate (BT-9) or PaymentTerms/Note (BT-20) must be present`,
+          '/Invoice/cac:LegalMonetaryTotal/cbc:PayableAmount'
+        )
+      );
+    }
+  }
+
+  // ============================================================
+  // Phase 22: PEPPOL-EN16931-R032 — TaxExclusiveAmount with allowances/charges
+  // TaxExclusiveAmount = LineExtensionAmount - allowances + charges
+  // Only check when document-level allowances or charges are present.
+  // ============================================================
+  const hasAllowancesOrCharges =
+    doc.allowanceCharges &&
+    doc.allowanceCharges.some(ac => ac.amount > 0);
+  if (doc.monetaryTotal && hasAllowancesOrCharges) {
+    const allowanceTotal = doc.allowanceCharges
+      .filter(ac => !ac.chargeIndicator)
+      .reduce((s, ac) => s + ac.amount, 0);
+    const chargeTotal = doc.allowanceCharges
+      .filter(ac => ac.chargeIndicator)
+      .reduce((s, ac) => s + ac.amount, 0);
+    const expected = doc.monetaryTotal.lineExtensionAmount - allowanceTotal + chargeTotal;
+    if (Math.abs(doc.monetaryTotal.taxExclusiveAmount - expected) > 0.01) {
+      errors.push(
+        makeError(
+          'R032',
+          'fatal',
+          `TaxExclusiveAmount (${doc.monetaryTotal.taxExclusiveAmount.toFixed(2)}) must equal LineExtensionAmount (${doc.monetaryTotal.lineExtensionAmount.toFixed(2)}) - allowances (${allowanceTotal.toFixed(2)}) + charges (${chargeTotal.toFixed(2)}) = ${expected.toFixed(2)}`,
+          '/Invoice/cac:LegalMonetaryTotal/cbc:TaxExclusiveAmount'
+        )
+      );
+    }
+  }
+
+  // ============================================================
+  // Phase 22: PEPPOL-EN16931-R042 — K-category VAT requires delivery date or period
+  // When any VAT breakdown line has category K (intra-community supply),
+  // an ActualDeliveryDate or InvoicePeriod must be present.
+  // ============================================================
+  if (doc.vatBreakdown && doc.vatBreakdown.some(v => v.category === 'K')) {
+    const hasDeliveryDate = !!(doc.deliveryDate && doc.deliveryDate.trim() !== '');
+    const hasInvoicePeriod = !!(
+      doc.invoicePeriod &&
+      (doc.invoicePeriod.startDate || doc.invoicePeriod.endDate)
+    );
+    if (!hasDeliveryDate && !hasInvoicePeriod) {
+      errors.push(
+        makeError(
+          'R042',
+          'fatal',
+          `Invoice contains VAT category K (intra-community supply) — ActualDeliveryDate or InvoicePeriod is required`,
+          '/Invoice/cac:Delivery/cbc:ActualDeliveryDate'
+        )
+      );
+    }
+  }
+
+  // ============================================================
+  // Phase 22: PEPPOL-EN16931-R055 — Allowance/charge reason and VAT category
+  // Each document-level allowance (BG-20) or charge (BG-21) must have
+  // a reason (BT-97/BT-98) and a VAT category.
+  // ============================================================
+  if (doc.allowanceCharges && doc.allowanceCharges.length > 0) {
+    for (let i = 0; i < doc.allowanceCharges.length; i++) {
+      const ac = doc.allowanceCharges[i];
+      const index = i + 1;
+      const acType = ac.chargeIndicator ? 'charge (BG-21)' : 'allowance (BG-20)';
+      if (!ac.reason || ac.reason.trim() === '') {
+        errors.push(
+          makeError(
+            'R055',
+            'fatal',
+            `Document-level ${acType} at index ${index} is missing a reason (BT-97/BT-98)`,
+            '/Invoice/cac:AllowanceCharge'
+          )
+        );
+      }
+      if (!ac.category || ac.category.trim() === '') {
+        errors.push(
+          makeError(
+            'R055',
+            'fatal',
+            `Document-level ${acType} at index ${index} is missing a VAT category`,
+            '/Invoice/cac:AllowanceCharge/cac:TaxCategory/cbc:ID'
+          )
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Phase 22: PEPPOL-EN16931-R050 — IBAN+BIC for credit transfer payment means
+  // When PaymentMeansCode is 30, 42, or 58 (credit transfer / SEPA),
+  // IBAN (BT-84) and BIC (BT-86) must both be present.
+  // ============================================================
+  const creditTransferCodes = new Set(['30', '42', '58']);
+  if (creditTransferCodes.has(pmCode)) {
+    const hasIban = !!(
+      (doc.paymentInstructions?.accountID && doc.paymentInstructions.accountID.trim() !== '') ||
+      (doc.payment?.iban && doc.payment.iban.trim() !== '')
+    );
+    const hasBic = !!(
+      (doc.paymentInstructions?.bicCode && doc.paymentInstructions.bicCode.trim() !== '') ||
+      (doc.payment?.bic && doc.payment.bic.trim() !== '')
+    );
+    if (!hasIban) {
+      errors.push(
+        makeError(
+          'R050',
+          'fatal',
+          `PaymentMeansCode '${pmCode}' (credit transfer) requires IBAN (BT-84)`,
+          '/Invoice/cac:PaymentMeans/cac:PayeeFinancialAccount/cbc:ID'
+        )
+      );
+    }
+    if (!hasBic) {
+      errors.push(
+        makeError(
+          'R050',
+          'fatal',
+          `PaymentMeansCode '${pmCode}' (credit transfer) requires BIC (BT-86)`,
+          '/Invoice/cac:PaymentMeans/cac:PayeeFinancialAccount/cac:FinancialInstitutionBranch/cbc:ID'
         )
       );
     }
