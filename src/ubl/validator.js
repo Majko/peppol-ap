@@ -7,13 +7,24 @@
 import { parseUBL } from './parser.js';
 
 // Allowed code lists
+// DE-R-017: Full Peppol BIS Billing 3.0 invoice type code list
 const VALID_INVOICE_TYPE_CODES = new Set([
+  '326', // Partial invoice
   '380', // Invoice
   '381', // Credit note
-  '383', // Corrected invoice
   '384', // Self-billed invoice
-  '386', // Prepayment invoice
   '389', // Self-billed credit note
+  '875', // Invoice for bad debt write-off
+  '876', // Credit note for bad debt write-off
+  '877', // Invoice with reduced payment deadline
+]);
+
+// DE-R-017: Credit note type codes (subset of invoice codes used in CreditNote documents)
+const VALID_CREDIT_NOTE_TYPE_CODES = new Set([
+  '381', // Credit note
+  '875', // Credit note for bad debt write-off
+  '876', // Debit note for bad debt write-off
+  '877', // Credit note with reduced payment deadline
 ]);
 
 const VALID_VAT_CATEGORIES = new Set([
@@ -214,14 +225,28 @@ export function validateUBL(xmlString) {
     }
   }
 
-  // Phase 4: Check invoice type code (R003)
+  // Phase 4: Check invoice/credit note type code (DE-R-017)
+  // DE-R-017 is a WARNING in the Peppol spec, not fatal
   if (doc.invoiceTypeCode && !VALID_INVOICE_TYPE_CODES.has(doc.invoiceTypeCode)) {
     errors.push(
       makeError(
-        'R003',
-        'fatal',
-        `Invalid invoice type code: ${doc.invoiceTypeCode}. Allowed: ${Array.from(VALID_INVOICE_TYPE_CODES).join(', ')}`,
+        'DE-R-017',
+        'warning',
+        `Invalid InvoiceTypeCode '${doc.invoiceTypeCode}'. Valid Peppol codes: ${Array.from(VALID_INVOICE_TYPE_CODES).join(', ')}`,
         '/Invoice/cbc:InvoiceTypeCode'
+      )
+    );
+  }
+
+  // Additional check: when document is a CreditNote, validate the type code is a valid credit note code
+  // (CreditNote documents use InvoiceTypeCode element but should only use credit note codes)
+  if (doc.isCreditNote && doc.invoiceTypeCode && !VALID_CREDIT_NOTE_TYPE_CODES.has(doc.invoiceTypeCode)) {
+    errors.push(
+      makeError(
+        'DE-R-017',
+        'warning',
+        `CreditNote has invalid type code '${doc.invoiceTypeCode}'. Valid credit note codes: ${Array.from(VALID_CREDIT_NOTE_TYPE_CODES).join(', ')}`,
+        '/CreditNote/cbc:InvoiceTypeCode'
       )
     );
   }

@@ -4,6 +4,18 @@
  * Supports Invoice and CreditNote documents
  */
 
+// DE-R-017: Full Peppol BIS Billing 3.0 invoice type code list
+const VALID_INVOICE_TYPE_CODES = new Set([
+  '326', // Partial invoice
+  '380', // Invoice
+  '381', // Credit note
+  '384', // Self-billed invoice
+  '389', // Self-billed credit note
+  '875', // Invoice for bad debt write-off
+  '876', // Credit note for bad debt write-off
+  '877', // Invoice with reduced payment deadline
+]);
+
 /**
  * Escape XML special characters in a string
  */
@@ -27,8 +39,18 @@ function fmt(num) {
 
 /**
  * Build the UBL XML header elements
+ * @throws {Error} if invoiceTypeCode is not a valid Peppol code
  */
 function buildHeader(data, docType) {
+  // Validate InvoiceTypeCode against DE-R-017 codelist
+  if (data.invoiceTypeCode && !VALID_INVOICE_TYPE_CODES.has(data.invoiceTypeCode)) {
+    const validCodes = Array.from(VALID_INVOICE_TYPE_CODES).join(', ');
+    throw new Error(
+      `Invalid InvoiceTypeCode '${data.invoiceTypeCode}'. ` +
+      `Valid Peppol BIS Billing 3.0 codes are: ${validCodes}`
+    );
+  }
+
   return `
   <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
   <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>

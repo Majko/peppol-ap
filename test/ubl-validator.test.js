@@ -71,11 +71,8 @@ describe('UBL Validator', () => {
 
   it('should reject invalid invoice type code', () => {
     const badData = { ...sampleInvoiceData, invoiceTypeCode: '999' };
-    const xml = generateInvoice(badData);
-    const result = validateUBL(xml);
-
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.rule === 'R003')).toBe(true);
+    // Generator now validates InvoiceTypeCode against DE-R-017 codelist and throws
+    expect(() => generateInvoice(badData)).toThrow(/Invalid InvoiceTypeCode/);
   });
 
   it('should reject missing seller endpoint ID', () => {
