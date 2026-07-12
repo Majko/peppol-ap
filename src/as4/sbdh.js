@@ -66,7 +66,7 @@ export function buildSBDH(params) {
     </Receiver>
     <DocumentIdentification>
       <Standard>${esc(standard)}</Standard>
-      <TypeVersion>2.1</TypeVersion>
+      <TypeVersion>2.0</TypeVersion>
       <InstanceIdentifier>${esc(instanceIdentifier)}</InstanceIdentifier>
       <Type>${esc(documentType)}</Type>
       <CreationDateAndTime>${esc(creationDateAndTime)}</CreationDateAndTime>
@@ -113,6 +113,7 @@ export function parseSBDH(xmlString) {
   }
 
   const result = {};
+  const errors = [];
 
   // Extract sender
   const sender = getVal(sbdh, 'Sender', 'Identifier', '#text') ||
@@ -142,6 +143,9 @@ export function parseSBDH(xmlString) {
                       getVal(docId, 'Standard');
     result.typeVersion = getVal(docId, 'TypeVersion', '#text') ||
                          getVal(docId, 'TypeVersion');
+    if (result.typeVersion && result.typeVersion !== '2.0') {
+      errors.push(`SBDH TypeVersion "${result.typeVersion}" is not "2.0" — warning only`);
+    }
     result.documentType = getVal(docId, 'Type', '#text') ||
                           getVal(docId, 'Type');
     result.creationDateAndTime = getVal(docId, 'CreationDateAndTime', '#text') ||
@@ -163,6 +167,8 @@ export function parseSBDH(xmlString) {
       result.countryC1 = instanceId;
     }
   }
+
+  result.errors = errors;
 
   return result;
 }
