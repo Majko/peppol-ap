@@ -1,0 +1,28 @@
+{
+  "name": "send-flow-validation-error",
+  "description": "Send flow — invalid UBL should return validation_failed error",
+  "category": "send",
+  "input": {
+    "senderId": "9914:SK2023456789",
+    "receiverId": "0088:SK0000000000",
+    "payload": {
+      "id": "INVALID",
+      "issueDate": "not-a-date",
+      "invoiceTypeCode": "INVALID",
+      "currencyCode": "XXX",
+      "seller": { "endpointID": "", "endpointSchemeID": "9914", "name": "", "cityName": "", "countryCode": "SK" },
+      "buyer": { "endpointID": "", "endpointSchemeID": "0088", "name": "", "cityName": "", "countryCode": "SK" },
+      "vatBreakdown": [],
+      "monetaryTotal": {
+        "lineExtensionAmount": 0,
+        "taxExclusiveAmount": 0,
+        "taxInclusiveAmount": 0,
+        "payableAmount": 0
+      },
+      "lines": []
+    }
+  },
+  "expected": {
+    "error": "validation_failed"
+  }
+}

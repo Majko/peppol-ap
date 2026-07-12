@@ -3,14 +3,16 @@
  */
 import { describe, it, expect } from 'vitest';
 import { v4 as uuidv4 } from 'uuid';
-import { buildAS4Message, parseAS4Message } from '../src/as4/message.js';
+import { buildAS4Message, parseAS4Message, buildAS4Error, EbMSErrorCodes } from '../src/as4/message.js';
 import { buildSBDH } from '../src/as4/sbdh.js';
 import { generateInvoice } from '../src/ubl/generator.js';
 import { sampleInvoiceData, sampleSBDH } from './fixtures.js';
+import { resolve } from 'node:path';
 
 const AP_ID = 'POP000123';
 const RECEIVER_AP_ID = 'POP000456';
 const MESSAGE_ID = `uuid:${uuidv4()}@ap.mojafaktura.sk`;
+const SIM_KEY_PATH = resolve(process.cwd(), 'test/fixtures/keys/sim-signing-key.pem');
 
 describe('AS4 Message', () => {
   describe('buildAS4Message', () => {
@@ -136,6 +138,129 @@ describe('AS4 Message', () => {
       expect(message).toContain('finalRecipient');
       expect(message).toContain(sampleSBDH.senderId);
       expect(message).toContain(sampleSBDH.receiverId);
+    });
+
+    it('should produce a signed message with ds:Signature when signing key is provided', () => {
+      const ublXml = generateInvoice(sampleInvoiceData);
+      const sbdhXml = buildSBDH({ ...sampleSBDH, ublXml });
+
+      const message = buildAS4Message({
+        messageId: MESSAGE_ID,
+        fromApId: AP_ID,
+        toApId: RECEIVER_AP_ID,
+        senderParticipantId: sampleSBDH.senderId,
+        receiverParticipantId: sampleSBDH.receiverId,
+        payload: sbdhXml,
+        documentType: 'invoice',
+        processId: sampleSBDH.processID,
+        signingKeyPath: SIM_KEY_PATH,
+      });
+
+      // Verify signature elements are present in the SOAP envelope
+      expect(message).toContain('<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"');
+      expect(message).toContain('<SignedInfo>');
+      expect(message).toContain('<SignatureValue>');
+      expect(message).toContain('<DigestValue>');
+      // RSA-SHA256 signature method
+      expect(message).toContain('http://www.w3.org/2001/04/xmldsig-more#rsa-sha256');
+      // SHA-256 digest
+      expect(message).toContain('http://www.w3.org/2001/04/xmlenc#sha256');
+      // Exclusive C14N canonicalization
+      expect(message).toContain('http://www.w3.org/2001/10/xml-exc-c14n#');
+    });
+
+    it('should be able to parse a signed message and extract fields', async () => {
+      const ublXml = generateInvoice(sampleInvoiceData);
+      const sbdhXml = buildSBDH({ ...sampleSBDH, ublXml });
+
+      const message = buildAS4Message({
+        messageId: MESSAGE_ID,
+        fromApId: AP_ID,
+        toApId: RECEIVER_AP_ID,
+        senderParticipantId: sampleSBDH.senderId,
+        receiverParticipantId: sampleSBDH.receiverId,
+        payload: sbdhXml,
+        documentType: 'invoice',
+        processId: sampleSBDH.processID,
+        signingKeyPath: SIM_KEY_PATH,
+      });
+
+      const parsed = await parseAS4Message(message);
+
+      expect(parsed.messageId).toBe(MESSAGE_ID);
+      expect(parsed.fromApId).toBe(AP_ID);
+      expect(parsed.toApId).toBe(RECEIVER_AP_ID);
+      expect(parsed.senderParticipantId).toBe(sampleSBDH.senderId);
+      expect(parsed.receiverParticipantId).toBe(sampleSBDH.receiverId);
+      expect(parsed.timestamp).toBeTruthy();
+      expect(parsed.payload).toBeTruthy();
+      // The payload should contain the SBDH
+      expect(parsed.payload).toContain('StandardBusinessDocumentHeader');
+    });
+  });
+
+  describe('buildAS4Error', () => {
+    it('should produce a valid eb:SignalMessage XML', () => {
+      const xml = buildAS4Error(EbMSErrorCodes.EB001_MESSAGE_STRUCTURE, 'Test error');
+
+      expect(xml).toContain('<soap:Envelope');
+      expect(xml).toContain('</soap:Envelope>');
+      expect(xml).toContain('<eb:Messaging');
+      expect(xml).toContain('<eb:SignalMessage>');
+      expect(xml).toContain('<eb:Error');
+      expect(xml).toContain('<eb:ErrorCode>EB:001</eb:ErrorCode>');
+      expect(xml).toContain('<eb:Severity>failure</eb:Severity>');
+      expect(xml).toContain('<eb:Description>Test error</eb:Description>');
+    });
+
+    it('should include RefToMessageId when provided', () => {
+      const refMsgId = 'uuid:original-msg-id@ap.mojafaktura.sk';
+      const xml = buildAS4Error(
+        EbMSErrorCodes.EB002_REQUIRED_FIELD_MISSING,
+        'Missing payload',
+        null,
+        refMsgId
+      );
+
+      expect(xml).toContain('<eb:RefToMessageId>');
+      expect(xml).toContain(refMsgId);
+    });
+
+    it('should include details in Description when provided', () => {
+      const xml = buildAS4Error(
+        EbMSErrorCodes.EB003_VALUE_FORMAT,
+        'Invalid format',
+        'Expected ISO 8601 date but got: not-a-date'
+      );
+
+      expect(xml).toContain('Invalid format');
+      expect(xml).toContain('Expected ISO 8601 date but got: not-a-date');
+    });
+
+    it('should produce EB:004 error for unsupported action', () => {
+      const xml = buildAS4Error(EbMSErrorCodes.EB004_UNSUPPORTED_ACTION, 'Unsupported document type');
+
+      expect(xml).toContain('<eb:ErrorCode>EB:004</eb:ErrorCode>');
+    });
+
+    it('should escape XML special characters in message and details', () => {
+      const xml = buildAS4Error(
+        EbMSErrorCodes.EB001_MESSAGE_STRUCTURE,
+        'Error with <invalid> & "quotes"',
+        'Detail with <script> tags'
+      );
+
+      expect(xml).toContain('&lt;invalid&gt;');
+      expect(xml).toContain('&amp;');
+      expect(xml).toContain('&quot;quotes&quot;');
+      expect(xml).toContain('&lt;script&gt;');
+    });
+
+    it('should include the error code attribute on eb:Error element', () => {
+      const xml = buildAS4Error(EbMSErrorCodes.EB007_SIGNATURE_FAILED, 'Signature verification failed');
+
+      // The code attribute on eb:Error
+      expect(xml).toMatch(/<eb:Error[^>]*code="EB:007"/);
     });
   });
 });

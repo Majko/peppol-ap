@@ -11,9 +11,15 @@
  * - MDN receipts — generate realistic signed acknowledgements
  * - Inbound message queue — simulate other APs sending to us
  * - Transaction log — full audit trail
+ *
+ * Simulation signing: Uses hardcoded RSA test key for AS4 messages and MDN receipts
+ * in simulation mode. The key is at test/fixtures/keys/sim-signing-key.pem.
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { signXml } from './as4/message.js';
 
 // ═══════════════════════════════════════════════════════
 //  Participant Registry (simulated SMP)
@@ -142,12 +148,22 @@ export function createInboundMessage({ senderId, receiverId, ublXml, senderApId 
 export async function buildInboundAS4Message({ senderId, receiverId, ublXml, senderApId = 'POP000999', documentType = 'invoice' }) {
   const { buildSBDH } = await import('./as4/sbdh.js');
   const { buildAS4Message } = await import('./as4/message.js');
+  const { parseUBL } = await import('./ubl/parser.js');
 
   const messageId = `uuid:${uuidv4()}@${senderApId.toLowerCase()}.local`;
   const timestamp = new Date().toISOString();
   const docTypeUpper = documentType === 'credit_note' ? 'CreditNote' : 'Invoice';
   const ns = `urn:oasis:names:specification:ubl:schema:xsd:${docTypeUpper}-2`;
   const documentTypeIdentifier = `${ns}::${docTypeUpper}##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1`;
+
+  // Extract seller country from UBL XML for countryC1
+  let sellerCountry = 'SK';
+  try {
+    const parsed = parseUBL(ublXml);
+    sellerCountry = parsed.seller?.countryCode || 'SK';
+  } catch {
+    // Keep SK as default
+  }
 
   const sbdhXml = buildSBDH({
     senderId,
@@ -157,7 +173,7 @@ export async function buildInboundAS4Message({ senderId, receiverId, ublXml, sen
     documentType: docTypeUpper,
     documentTypeIdentifier,
     processID: 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0',
-    countryC1: extractCountry(senderId),
+    countryC1: sellerCountry,
     ublXml,
   });
 
@@ -194,8 +210,25 @@ export function drainInboundMessages() {
 export function simulatedLookup(participantId) {
   const participant = participants.get(participantId);
 
+  // In simulation mode, return a plausible simulated response even for unknown
+  // participants — this avoids requiring pre-registration for every test party.
   if (!participant) {
-    throw new Error(`Participant not found: ${participantId}. Register with registerParticipant() first.`);
+    const parts = participantId.split(':');
+    return {
+      participantId,
+      smpUrl: `https://smp.${parts[1] || 'unknown'}.sim.local`,
+      services: [
+        {
+          document_type:
+            'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1',
+          process_id: 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0',
+          endpoint: `https://ap.${(parts[1] || 'unknown').toLowerCase()}.sim.local/as4`,
+          certificate: `-----BEGIN CERTIFICATE-----\nMIIFpTCCA44CCQDb7fMkh6tU/TANBgkqhkiG9w0BAQsFADCB\n-----END CERTIFICATE-----`,
+        },
+      ],
+      resolved_at: new Date().toISOString(),
+      simulated: true,
+    };
   }
 
   return {

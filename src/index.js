@@ -13,42 +13,59 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { createHmac } from 'node:crypto';
 import { generateInvoice, generateCreditNote } from './ubl/generator.js';
 import { parseUBL } from './ubl/parser.js';
 import { validateUBL } from './ubl/validator.js';
 import { buildSBDH, parseSBDH } from './as4/sbdh.js';
-import { buildAS4Message, parseAS4Message } from './as4/message.js';
+import { buildAS4Message, parseAS4Message, verifyIncomingSignature, signXml, getSimSigningKeyPath } from './as4/message.js';
+import { decryptPayload, isEncrypted } from './as4/encryption.js';
 import * as node42 from './as4/node42.js';
 import * as simulator from './simulator.js';
+import { createStore } from './store/factory.js';
+import {
+  recordTransaction,
+  recordTransactionDuration,
+  recordSmpLookup,
+  recordWebhookFired,
+  recordWebhookFailure,
+} from './middleware/metrics.js';
+import { CertExpiredError, CertNotFoundError } from './errors.js';
 
-// In-memory transaction store
-const transactions = new Map();
+// ── Store initialisation ────────────────────────────────────────────────────────
+// Default: mock adapter (zero-config for development and tests)
+// Set PEPPOL_STORE_ADAPTER=sqlite and AP_CORE_DB_PATH to use SQLite
 
-// Simulation mode (no external network calls needed)
-let simulationMode = false;
+const STORE_ADAPTER = process.env.PEPPOL_STORE_ADAPTER || 'mock';
+const STORE_DB_PATH  = process.env.AP_CORE_DB_PATH;
 
-/**
- * Enable simulation mode — all Peppol network operations happen in-memory.
- * No DNS/SML/SMP lookups, no real AS4 transport. Returns realistic MDN receipts.
- * Perfect for development, testing, and demo environments.
- */
-export function enableSimulation() {
-  simulationMode = true;
+/** @type {{ transactionStore: TransactionStore, smpCache: SMPCache, identityStore: APIdentityStore }} */
+let stores = createStore(STORE_ADAPTER, { dbPath: STORE_DB_PATH });
+
+/** Allow tests to inject real stores. @internal */
+export function _setStores(newStores) {
+  stores = newStores;
 }
 
-/**
- * Disable simulation mode and use real Peppol network
- */
-export function disableSimulation() {
-  simulationMode = false;
+/** Allow tests to read the current stores. @internal */
+export function _getStores() {
+  return stores;
 }
 
-/**
- * Check if simulation mode is active
- */
-export function isSimulationEnabled() {
-  return simulationMode;
-}
+const { transactionStore, smpCache, identityStore } = stores;
+
+import {
+  enableSimulation,
+  disableSimulation,
+  isSimulationEnabled,
+} from './simulation.js';
+import { simulationMode } from './simulation.js';
+export {
+  enableSimulation,
+  disableSimulation,
+  isSimulationEnabled,
+  simulationMode,
+} from './simulation.js';
 
 // Webhook registration
 let webhookConfig = null;
@@ -58,6 +75,8 @@ const config = {
   apId: process.env.PEPPOL_AP_ID || 'POP000001',
   apDomain: process.env.PEPPOL_AP_DOMAIN || 'ap.mojafaktura.sk',
   mode: process.env.PEPPOL_MODE || 'test', // 'test' or 'production'
+  dryrun: process.env.AP_CORE_DRY_RUN === 'true',
+  truststorePath: process.env.AP_CORE_TRUSTSTORE_PATH || null,
 };
 
 // Default Peppol process ID
@@ -83,6 +102,9 @@ function generateMessageId() {
   return `uuid:${uuidv4()}@${config.apDomain}`;
 }
 
+// ── For backwards-compatible health endpoint (tx count) ──────────────────────────
+let _txCount = 0;
+
 // ═══════════════════════════════════════════════════════
 //  Operation 1: Send Invoice
 // ═══════════════════════════════════════════════════════
@@ -100,6 +122,7 @@ function generateMessageId() {
 export async function sendInvoice(params) {
   const { senderId, receiverId, ublXml, documentType, processId } = params;
   const timestamp = new Date().toISOString();
+  const _startTime = Date.now();
 
   // Step 1: Validate the UBL XML
   const validation = validateUBL(ublXml);
@@ -125,7 +148,16 @@ export async function sendInvoice(params) {
   const messageId = generateMessageId();
   const docTypeIdentifier = getDocTypeIdentifier({}, docType);
 
-  // Step 4: Build SBDH envelope
+  // Step 4: Extract seller country from UBL XML for countryC1
+  let sellerCountry = 'SK';
+  try {
+    const parsedForCountry = parseUBL(ublXml);
+    sellerCountry = parsedForCountry.seller?.countryCode || 'SK';
+  } catch {
+    // Keep SK as default
+  }
+
+  // Step 5: Build SBDH envelope
   const sbdhParams = {
     senderId,
     receiverId,
@@ -134,15 +166,14 @@ export async function sendInvoice(params) {
     documentType: docType === 'credit_note' ? 'CreditNote' : 'Invoice',
     documentTypeIdentifier: docTypeIdentifier,
     processID: processId || DEFAULT_PROCESS_ID,
-    countryC1: extractCountryCode(senderId) || 'SK',
+    countryC1: sellerCountry,
     ublXml,
   };
   const sbdhXml = buildSBDH(sbdhParams);
 
-  // Step 5: Lookup receiver and send
+  // Step 6: Lookup receiver and send
   if (simulationMode) {
     // ── SIMULATION MODE ────────────────────────────────────────────────────────
-    // Use the simulated network: in-memory participant lookup, realistic MDN receipt
     const simResult = await simulator.simulateSend(
       senderId,
       receiverId,
@@ -156,16 +187,17 @@ export async function sendInvoice(params) {
       status: 'delivered',
       senderId,
       receiverId,
-      documentType: docType,
+      docTypeId: docType,
       sbdhXml,
       ublXml,
       receiptXml: simResult.receipt,
-      receiptMessageId: simResult.receiptMessageId,
       timestamp: simResult.timestamp,
       completedAt: simResult.timestamp,
-      simulated: true,
     };
-    transactions.set(simResult.messageId, tx);
+    await transactionStore.save(tx);
+    _txCount++;
+    recordTransaction('send', 'delivered');
+    recordTransactionDuration((Date.now() - _startTime) / 1000);
 
     return {
       messageId: simResult.messageId,
@@ -176,30 +208,49 @@ export async function sendInvoice(params) {
     };
   }
 
-  // ── PRODUCTION MODE ── use Node42's public sendDocument() ──────────────────
+  // ── PRODUCTION MODE ── use Node42's public sendDocument() ────────────────────
   try {
-    // n42.sendDocument handles: SMP lookup, AS4 build, sign, encrypt, HTTPS POST, MDN receipt
+    // Step 5a: Load active cert from identity store
+    const activeCert = await identityStore.getActiveCert();
+    if (!activeCert) {
+      throw new CertNotFoundError();
+    }
+
+    // Step 5b: Check cert expiry
+    if (activeCert.expiresAt) {
+      const expiry = new Date(activeCert.expiresAt);
+      if (expiry <= new Date()) {
+        throw new CertExpiredError(activeCert.certId, activeCert.expiresAt);
+      }
+    }
+
     const result = await node42.sendViaNode42(sbdhXml, {
-      cert: node42.getCertPaths().cert,
-      key: node42.getCertPaths().key,
-      truststore: node42.getCertPaths().truststore,
+      certPem: activeCert.certPem,
+      keyPem: activeCert.privKeyPem,
+      truststorePath: config.truststorePath || undefined,
+      certId: activeCert.certId,
+      expiresAt: activeCert.expiresAt,
       env: config.mode,
-      dryrun: true, // No PKI certs yet — builds the message but doesn't send it
+      dryrun: config.dryrun,
     });
 
-    transactions.set(result.messageId, {
+    const tx = {
       messageId: result.messageId,
       direction: 'send',
       status: result.status,
       senderId,
       receiverId,
-      documentType: docType,
+      docTypeId: docType,
       sbdhXml,
       ublXml,
       receiptXml: result.receipt || null,
       timestamp,
       completedAt: result.timestamp || timestamp,
-    });
+    };
+    await transactionStore.save(tx);
+    _txCount++;
+    recordTransaction('send', result.status);
+    recordTransactionDuration((Date.now() - _startTime) / 1000);
 
     return {
       messageId: result.messageId,
@@ -208,23 +259,56 @@ export async function sendInvoice(params) {
       timestamp: result.timestamp || timestamp,
     };
   } catch (err) {
-    // Node42 send failed (no PKI certs). Record as pending.
-    transactions.set(messageId, {
+    if (err instanceof CertNotFoundError || err instanceof CertExpiredError) {
+      // Cert errors — record as error immediately (no pending/retry)
+      const tx = {
+        messageId,
+        direction: 'send',
+        status: 'error',
+        senderId,
+        receiverId,
+        docTypeId: docType,
+        sbdhXml,
+        ublXml,
+        timestamp,
+        errorMessage: err.message,
+      };
+      await transactionStore.save(tx);
+      _txCount++;
+      recordTransaction('send', 'error');
+      recordTransactionDuration((Date.now() - _startTime) / 1000);
+
+      return {
+        messageId,
+        status: 'error',
+        receipt: null,
+        timestamp,
+        error: err.name === 'CertExpiredError' ? 'cert_expired' : 'cert_not_found',
+        details: [{ message: err.message }],
+      };
+    }
+
+    // Node42 send failed (network error, HTTP 4xx/5xx, timeout, etc.)
+    const tx = {
       messageId,
       direction: 'send',
-      status: 'pending',
+      status: 'error',
       senderId,
       receiverId,
-      documentType: docType,
+      docTypeId: docType,
       sbdhXml,
       ublXml,
       timestamp,
-      error: err.message,
-    });
+      errorMessage: err.message,
+    };
+    await transactionStore.save(tx);
+    _txCount++;
+    recordTransaction('send', 'error');
+    recordTransactionDuration((Date.now() - _startTime) / 1000);
 
     return {
       messageId,
-      status: 'pending',
+      status: 'error',
       receipt: null,
       timestamp,
       error: 'send_failed',
@@ -241,7 +325,7 @@ export async function sendInvoice(params) {
  * Register a webhook for incoming document delivery
  * @param {Object} params
  * @param {string} params.url - Callback URL
- * @param {string} params.secret - Shared secret for HMAC signing
+ * @param {string} [params.secret] - Shared secret for HMAC signing
  * @returns {{ success: boolean, url: string }}
  */
 export function registerWebhook(params) {
@@ -251,7 +335,7 @@ export function registerWebhook(params) {
 
   webhookConfig = {
     url: params.url,
-    secret: params.secret || 'whsec_default',
+    secret: params.secret || null,
     registeredAt: new Date().toISOString(),
   };
 
@@ -269,13 +353,56 @@ export function registerWebhook(params) {
  */
 export async function handleIncomingMessage(mimeMessage) {
   // Step 1: Parse the AS4 message
-  const parsed = parseAS4Message(mimeMessage);
+  const parsed = await parseAS4Message(mimeMessage);
 
   if (!parsed.payload) {
     throw new Error('No payload found in incoming AS4 message');
   }
 
-  // Step 2: Extract SBDH metadata
+  // Step 2: Decrypt xenc:EncryptedData in the SOAP body (skip in simulation mode)
+  if (parsed.rawSoap && isEncrypted(parsed.rawSoap)) {
+    let decryptionKey = null;
+    if (simulationMode) {
+      // In simulation mode, decryption is bypassed — encrypted payloads are
+      // treated as already-decrypted test fixtures
+      // No-op: the encrypted element is left as-is
+    } else {
+      // Production: retrieve the receiving AP's private key from the identity store
+      try {
+        decryptionKey = await identityStore.getDecryptionKey();
+      } catch (err) {
+        const de = new Error(`Failed to retrieve decryption key: ${err.message}`);
+        de.code = 'DECRYPTION_ERROR';
+        throw de;
+      }
+
+      if (!decryptionKey) {
+        const de = new Error('No decryption key available — no active certificate in identity store');
+        de.code = 'DECRYPTION_ERROR';
+        throw de;
+      }
+
+      try {
+        parsed.rawSoap = await decryptPayload(parsed.rawSoap, decryptionKey);
+      } catch (err) {
+        const de = new Error(`Payload decryption failed: ${err.message}`);
+        de.code = 'DECRYPTION_ERROR';
+        throw de;
+      }
+    }
+  }
+
+  // Step 3: Verify WS-Security signature (skip in simulation mode)
+  if (parsed.rawSoap) {
+    const sigResult = verifyIncomingSignature(parsed.rawSoap, parsed.senderParticipantId);
+    if (!sigResult.valid) {
+      const err = new Error(`Incoming message signature verification failed: ${sigResult.error}`);
+      err.code = 'INVALID_SIGNATURE';
+      throw err;
+    }
+  }
+
+  // Step 4: Extract SBDH metadata
   let sbdh;
   try {
     sbdh = parseSBDH(parsed.payload);
@@ -287,45 +414,75 @@ export async function handleIncomingMessage(mimeMessage) {
     };
   }
 
-  // Step 3: Extract UBL from the SBDH payload
+  // Step 5: Extract UBL from the SBDH payload
   let ublXml = null;
   if (parsed.payload) {
-    // Find the UBL document inside the SBDH
+    // Match the XML declaration (optional) followed by the Invoice or CreditNote root element
     const ublMatch = parsed.payload.match(
-      /<(Invoice|CreditNote)[\s\S]*?<\/(Invoice|CreditNote)>/
+      /(<\?xml[^?]*\?>\s*)?<(Invoice|CreditNote)[\s\S]*?<\/(Invoice|CreditNote)>/,
     );
     if (ublMatch) {
       ublXml = ublMatch[0];
     }
   }
 
-  // Step 4: Validate the UBL
+  // Step 6: Validate the UBL (validate the extracted UBL, not the SBDH wrapper)
   let validationResult = null;
   if (ublXml) {
     validationResult = validateUBL(ublXml);
   }
 
-  // Step 5: Generate MDN receipt (signed acknowledgement)
+  // Step 7: Generate MDN receipt (signed acknowledgement)
   const receiptMessageId = generateMessageId();
-  const mdnReceipt = buildMDNReceipt(parsed.messageId, receiptMessageId);
+  let mdnReceipt = buildMDNReceipt(parsed.messageId, receiptMessageId);
 
-  // Step 6: Record the transaction
+  // Sign the MDN in simulation mode using the sim signing key
+  if (simulationMode) {
+    const simKeyPath = getSimSigningKeyPath();
+    if (simKeyPath) {
+      try {
+        mdnReceipt = signXml(mdnReceipt, simKeyPath);
+      } catch (err) {
+        console.error('MDN signing failed (simulation):', err.message);
+      }
+    }
+  } else {
+    // Production: sign with receiving AP's private key from identity store
+    try {
+      const signingKey = identityStore?.getSigningKey?.();
+      if (signingKey) {
+        // identityStore returns { privateKey, certificate } — signXml needs a key path
+        // For now, if identityStore has getSigningKeyPath(), use it
+        const keyPath = identityStore?.getSigningKeyPath?.();
+        if (keyPath) {
+          mdnReceipt = signXml(mdnReceipt, keyPath);
+        }
+      }
+    } catch (err) {
+      console.error('MDN signing failed (production):', err.message);
+    }
+  }
+
+  // Step 8: Record the transaction
   const tx = {
     messageId: parsed.messageId,
     direction: 'receive',
     status: validationResult && validationResult.valid ? 'received' : 'error',
     senderId: sbdh.senderId || parsed.senderParticipantId,
     receiverId: sbdh.receiverId || parsed.receiverParticipantId,
-    documentType: extractDocType(ublXml),
+    docTypeId: extractDocType(ublXml),
     ublXml,
-    rawMessage: mimeMessage,
-    mdnReceipt,
-    validationErrors: validationResult ? validationResult.errors : [],
+    receiptXml: mdnReceipt,
     timestamp: new Date().toISOString(),
+    errorMessage: validationResult && !validationResult.valid
+      ? validationResult.errors.map(e => e.message).join('; ')
+      : null,
   };
-  transactions.set(parsed.messageId, tx);
+  await transactionStore.save(tx);
+  _txCount++;
+  recordTransaction('receive', tx.status);
 
-  // Step 7: Call webhook if registered
+  // Step 9: Call webhook if registered
   if (webhookConfig && ublXml) {
     await callWebhook({
       event: 'invoice.received',
@@ -333,7 +490,7 @@ export async function handleIncomingMessage(mimeMessage) {
       senderId: tx.senderId,
       receiverId: tx.receiverId,
       ublXml,
-      documentType: tx.documentType,
+      documentType: tx.docTypeId,
       receivedAt: tx.timestamp,
     });
   }
@@ -357,8 +514,8 @@ export async function handleIncomingMessage(mimeMessage) {
  * @param {string} messageId
  * @returns {{ messageId: string, status: string, receipt: string|null, error: string|null, retries: number, updated_at: string }}
  */
-export function getStatus(messageId) {
-  const tx = transactions.get(messageId);
+export async function getStatus(messageId) {
+  const tx = await transactionStore.get(messageId);
 
   if (!tx) {
     return {
@@ -374,10 +531,8 @@ export function getStatus(messageId) {
   return {
     messageId: tx.messageId,
     status: tx.status,
-    receipt: tx.mdnReceipt || null,
-    error: tx.validationErrors && tx.validationErrors.length > 0
-      ? tx.validationErrors[0].message
-      : null,
+    receipt: tx.receiptXml || null,
+    error: tx.errorMessage || null,
     retries: tx.retries || 0,
     updated_at: tx.completedAt || tx.timestamp,
   };
@@ -388,9 +543,12 @@ export function getStatus(messageId) {
 // ═══════════════════════════════════════════════════════
 
 /**
- * Resolve a Peppol participant ID to its SMP metadata
- * In production, this queries SML (DNS) → SMP (HTTP).
- * In test mode, it returns simulated data.
+ * Resolve a Peppol participant ID to its SMP metadata.
+ * In simulation mode, returns simulated data.
+ * In production, queries SML → SMP via Node42.
+ *
+ * Result is cached in SMPCache for TTL seconds to avoid redundant lookups.
+ *
  * @param {string} participantId - e.g. "9914:SK2023456789"
  * @returns {Promise<{ participantId: string, smpUrl: string, services: Array }>}
  */
@@ -413,26 +571,40 @@ export async function lookupParticipant(participantId) {
     );
   }
 
+  // Check SMP cache first
+  const cached = await smpCache.get(participantId);
+  if (cached) {
+    recordSmpLookup('hit');
+    return cached;
+  }
+
   if (simulationMode) {
-    return simulator.simulatedLookup(participantId);
+    const result = simulator.simulatedLookup(participantId);
+    // Cache the result (TTL 5 min in simulation)
+    await smpCache.set(participantId, result, 300);
+    recordSmpLookup('miss');
+    return result;
   }
 
   // Use Node42 for real SML→SMP lookup
-  return await node42.lookupParticipant(participantId, {
-    env: config.mode,
-  });
+  try {
+    const result = await node42.lookupParticipant(participantId, {
+      env: config.mode,
+    });
+    // Cache result (TTL 10 min in production)
+    await smpCache.set(participantId, result, 600);
+    recordSmpLookup('miss');
+    return result;
+  } catch (err) {
+    recordSmpLookup('error');
+    throw err;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
 //  Operation 5: Validate Document
 // ═══════════════════════════════════════════════════════
 
-/**
- * Validate a UBL document against Peppol Schematron rules
- * @param {string} ublXml - The UBL XML to validate
- * @param {string} [schema='peppol'] - Ruleset: 'peppol', 'cen', 'both'
- * @returns {{ valid: boolean, errors: Array<{rule: string, severity: string, message: string, location: string}>, warnings: Array }}
- */
 /**
  * Validate a UBL document against Peppol BIS Billing 3.0 rules.
  * Uses our comprehensive custom validator (15 rules covering mandatory fields,
@@ -498,7 +670,7 @@ export function buildCompleteAS4Message({
     documentType: docTypeUpper,
     documentTypeIdentifier: docTypeIdentifier,
     processID: processId,
-    countryC1: extractCountryCode(senderId) || 'SK',
+    countryC1: invoiceData.seller?.countryCode || 'SK',
     ublXml,
   });
 
@@ -530,7 +702,10 @@ function buildMDNReceipt(originalMessageId, receiptMessageId) {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
-               xmlns:eb="http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/">
+               xmlns:eb="http://docs.oasis-open.org/ebxml-msg/ebms/v3.0/ns/core/200704/"
+               xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"
+               xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+               xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
   <soap:Header>
     <eb:Messaging>
       <eb:SignalMessage>
@@ -539,10 +714,11 @@ function buildMDNReceipt(originalMessageId, receiptMessageId) {
           <eb:MessageId>${receiptMessageId}</eb:MessageId>
         </eb:MessageInfo>
         <eb:Receipt>
-          <eb:UserMessage>${originalMessageId}</eb:UserMessage>
+          <eb:RefToMessageId>${originalMessageId}</eb:RefToMessageId>
         </eb:Receipt>
       </eb:SignalMessage>
     </eb:Messaging>
+    <wsse:Security soap:mustUnderstand="true"/>
   </soap:Header>
   <soap:Body/>
 </soap:Envelope>`;
@@ -556,7 +732,6 @@ function extractCountryCode(participantId) {
   const parts = participantId.split(':');
   if (parts.length < 2) return null;
   const value = parts[1];
-  // For VAT-based IDs, country code is first 2 chars
   if (value.length >= 2 && value === value.toUpperCase()) {
     return value.substring(0, 2);
   }
@@ -582,28 +757,112 @@ function extractDocType(ublXml) {
 }
 
 /**
- * Call the registered webhook
+ * Compute HMAC-SHA256 signature for webhook payload (Stripe/Svix-compatible scheme).
+ *
+ * Algorithm:
+ *   signature = HMAC-SHA256(secret, body + timestamp)
+ *   header value = "sha256=" + hex(signature)
+ *
+ * Verification (downstream responsibility):
+ *   1. Read timestamp from X-Peppol-Timestamp header
+ *   2. Reject if timestamp is older than 5 minutes (replay protection)
+ *   3. Compute HMAC-SHA256(shared_secret, body + timestamp)
+ *   4. Compare against X-Peppol-Signature value (constant-time comparison recommended)
+ *   5. If match → payload is authentic
+ *
+ * @param {string} secret - Shared HMAC secret
+ * @param {string} body - Raw JSON body string
+ * @param {number} timestamp - Unix epoch seconds
+ * @returns {string} Hex-encoded signature prefixed with "sha256="
+ */
+function computeHmac(secret, body, timestamp) {
+  const hmac = createHmac('sha256', secret);
+  hmac.update(body);
+  hmac.update(String(timestamp));
+  return `sha256=${hmac.digest('hex')}`;
+}
+
+/**
+ * Call the registered webhook with HMAC-SHA256 signature headers.
+ *
+ * Retry policy: up to 3 attempts with exponential backoff (5s, 15s, 45s).
+ * Logs all delivery attempts. Does not throw on failure — failure is logged
+ * but does not crash the caller.
+ *
+ * @param {Object} payload - Webhook event payload
  */
 async function callWebhook(payload) {
   if (!webhookConfig) return;
 
-  try {
-    // In production, this would HTTP POST to webhookConfig.url
-    // with HMAC-SHA256 signature header
-    if (typeof fetch !== 'undefined') {
-      await fetch(webhookConfig.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Signature-256': 'placeholder-signature',
-        },
-        body: JSON.stringify(payload),
-      });
-    }
-  } catch {
-    // Webhook call failed - in production, implement retry logic
-    console.warn(`Webhook call to ${webhookConfig.url} failed`);
+  // Skip actual HTTP delivery in simulation/test mode — avoids retry delays
+  // (5s + 15s + 45s backoff) when webhook URL is unreachable in test env.
+  if (simulationMode || process.env.AP_CORE_DRY_RUN === 'true') {
+    console.log(`[webhook] skipped delivery in simulation mode (url=${webhookConfig.url})`);
+    recordWebhookFired();
+    return;
   }
+
+  const body = JSON.stringify(payload);
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  /** @type {Record<string, string>} */
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add HMAC signature headers when a secret is configured
+  if (webhookConfig.secret) {
+    headers['X-Peppol-Signature'] = computeHmac(webhookConfig.secret, body, timestamp);
+    headers['X-Peppol-Timestamp'] = String(timestamp);
+  }
+
+  const maxAttempts = 3;
+  const backoffMs = [5000, 15000, 45000]; // 5s, 15s, 45s
+
+  recordWebhookFired();
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      if (typeof fetch !== 'undefined') {
+        const response = await fetch(webhookConfig.url, {
+          method: 'POST',
+          headers,
+          body,
+        });
+
+        if (response.ok) {
+          console.log(
+            `[webhook] delivered successfully to ${webhookConfig.url} ` +
+            `(attempt ${attempt}/${maxAttempts})`
+          );
+          return;
+        }
+
+        // Non-2xx — treat as delivery failure and retry
+        console.warn(
+          `[webhook] delivery to ${webhookConfig.url} returned HTTP ${response.status} ` +
+          `(attempt ${attempt}/${maxAttempts})`
+        );
+      }
+    } catch (err) {
+      console.warn(
+        `[webhook] call to ${webhookConfig.url} failed: ${err.message} ` +
+        `(attempt ${attempt}/${maxAttempts})`
+      );
+    }
+
+    // Retry with backoff (except on last attempt)
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt - 1]));
+    }
+  }
+
+  // All retries exhausted
+  console.error(
+    `[webhook] all ${maxAttempts} delivery attempts to ${webhookConfig.url} failed. ` +
+    `Payload: ${body}`
+  );
+  recordWebhookFailure();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -612,24 +871,80 @@ async function callWebhook(payload) {
 
 /**
  * Get AP Core health status
+ * @returns {Promise<Object>} Structured health with individual checks
  */
-export function getHealth() {
+export async function getHealth() {
+  const now = new Date().toISOString();
+
+  // Storage check — list transactions to verify store is reachable
+  let storageCheck;
+  try {
+    const txs = await transactionStore.list({ limit: 1 });
+    storageCheck = { status: 'ok', message: `Store reachable (${txs.length} transactions)`, timestamp: now };
+  } catch (err) {
+    storageCheck = { status: 'error', message: `Store unreachable: ${err.message}`, timestamp: now };
+  }
+
+  // SMP cache check — verify cache is accessible
+  let smpCheck;
+  try {
+    // Just verify the cache.get works (null return is fine, error means broken)
+    await smpCache.get('__health_check__');
+    smpCheck = { status: 'ok', message: 'SMP cache operational', timestamp: now };
+  } catch (err) {
+    smpCheck = { status: 'error', message: `SMP cache error: ${err.message}`, timestamp: now };
+  }
+
+  // Certificate store check
+  let certCheck;
+  try {
+    const cert = await identityStore.getActiveCert();
+    if (cert) {
+      certCheck = { status: 'ok', message: `Active cert: ${cert.certId}`, timestamp: now };
+    } else {
+      certCheck = { status: 'warning', message: 'No active certificate configured', timestamp: now };
+    }
+  } catch (err) {
+    certCheck = { status: 'error', message: `Cert store error: ${err.message}`, timestamp: now };
+  }
+
+  // Config check
+  let configCheck;
+  const requiredFields = ['apId', 'apDomain', 'mode'];
+  const missing = requiredFields.filter(f => !config[f]);
+  if (missing.length === 0) {
+    configCheck = { status: 'ok', message: `AP ID: ${config.apId}, mode: ${config.mode}`, timestamp: now };
+  } else {
+    configCheck = { status: 'error', message: `Missing config fields: ${missing.join(', ')}`, timestamp: now };
+  }
+
+  // Overall status — worst check wins
+  const checks = [storageCheck, smpCheck, certCheck, configCheck];
+  const hasError = checks.some(c => c.status === 'error');
+  const hasWarning = checks.some(c => c.status === 'warning');
+
   return {
-    status: 'ok',
+    status: hasError ? 'error' : hasWarning ? 'warning' : 'ok',
     version: '1.0.0',
     mode: config.mode,
     simulationMode,
     apId: config.apId,
     uptime: process.uptime(),
-    transactionCount: transactions.size,
+    transactionCount: _txCount,
     webhookRegistered: webhookConfig !== null,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
+    checks: {
+      storage: storageCheck,
+      smp: smpCheck,
+      certificate: certCheck,
+      config: configCheck,
+    },
   };
 }
 
 /**
  * Get all transactions (for monitoring/debugging)
  */
-export function getTransactions() {
-  return Array.from(transactions.values());
+export async function getTransactions() {
+  return transactionStore.list({ limit: 1000 });
 }

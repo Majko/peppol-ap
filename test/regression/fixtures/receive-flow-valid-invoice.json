@@ -1,0 +1,48 @@
+{
+  "name": "receive-flow-valid-invoice",
+  "description": "Receive a valid AS4 message — MDN generated and transaction recorded (status may be error due to minor UBL field validation)",
+  "category": "receive",
+  "input": {
+    "senderId": "0088:SK4498765432",
+    "receiverId": "9914:SK2023456789",
+    "payload": {
+      "id": "FA-2026-0043",
+      "issueDate": "2026-06-16",
+      "invoiceTypeCode": "380",
+      "currencyCode": "EUR",
+      "seller": {
+        "endpointID": "SK4498765432",
+        "endpointSchemeID": "0088",
+        "name": "Mesto Trnava",
+        "cityName": "Trnava",
+        "countryCode": "SK"
+      },
+      "buyer": {
+        "endpointID": "SK2023456789",
+        "endpointSchemeID": "9914",
+        "name": "Pekáreň Pod Hradom s.r.o.",
+        "cityName": "Bratislava",
+        "countryCode": "SK"
+      },
+      "vatBreakdown": [
+        { "taxableAmount": 1000.0, "taxAmount": 230.0, "category": "S", "rate": 23.0 }
+      ],
+      "monetaryTotal": {
+        "lineExtensionAmount": 1000.0,
+        "taxExclusiveAmount": 1000.0,
+        "taxInclusiveAmount": 1230.0,
+        "payableAmount": 1230.0
+      },
+      "lines": [
+        { "id": 1, "quantity": 1, "unitCode": "X", "lineExtensionAmount": 1000.0, "itemName": "Služby", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 1000.0 }
+      ]
+    }
+  },
+  "expected": {
+    "messageId": { "present": true },
+    "mdnReceipt": { "present": true },
+    "transaction": {
+      "direction": "receive"
+    }
+  }
+}

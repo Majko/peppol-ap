@@ -120,9 +120,9 @@
     <td><span class="badge" style="background:#dc2626;">✅ YES — legal requirement</span></td>
   </tr>
   <tr>
-    <td><strong>Each SME must have a legal relationship with the provider.</strong> The form of this relationship is not prescribed.</td>
-    <td>Implied by KYC responsibility. The FS FAQ says KYC is the provider's responsibility.</td>
-    <td><span class="badge" style="background:#f59e0b;">✅ Required — but form is flexible</span></td>
+    <td><strong>Each SME must have a contractual relationship with the Peppol Service Provider</strong> — either directly or <strong>indirectly through an intermediary</strong> (like us).</td>
+    <td>Peppol SPA v4.0.2, Section 9.2: <em>"The Peppol Service Provider shall ensure that there is a contractual relationship in place with the End User, either directly with the Peppol Service Provider or <strong>indirectly through an intermediary</strong> with whom the Peppol Service Provider has a contractual relationship."</em></td>
+    <td><span class="badge" style="background:#f59e0b;">✅ Required — but <strong>indirect via us is OK</strong></span></td>
   </tr>
   <tr>
     <td><strong>When switching providers, the old provider must deregister the SME from the centralised SMP within 3 working days.</strong></td>
@@ -131,7 +131,7 @@
   </tr>
 </table>
 
-<h3>2.3 What Is NOT Legally Required (Stormware's Business Policy)</h3>
+<h3>2.3 What Is NOT Legally Required (Stormware's Business Policy) — Updated</h3>
 
 <p>Stormware Pohoda's published conditions state that for an accounting firm to issue invoices on behalf of a client:</p>
 <ul>
@@ -140,14 +140,14 @@
   <li>The client must consent to Stormware's T&Cs</li>
 </ul>
 
-<p>We traced each of these against the official PA SK and FS documents. Here's the verdict:</p>
+<p>After also checking the <strong>Peppol Service Provider Agreement (SPA) v4.0.2</strong> (Section 9.2), we found an important nuance. Here's the corrected verdict:</p>
 
 <table>
   <tr><th>Stormware's condition</th><th>Legal basis?</th><th>Verdict</th></tr>
   <tr>
     <td><strong>Separate contract between Stormware and each SME</strong></td>
-    <td>The PASR says provider must have a legal relationship with end users, but does <strong>not</strong> mandate a separate physical contract per SME. Clickwrap T&Cs during self-service onboarding are legally sufficient.</td>
-    <td><span class="badge" style="background:#10b981;">❌ Stormware's choice</span><br>You can use digital clickwrap</td>
+    <td><strong>Peppol SPA 9.2 requires</strong> a contractual relationship between the Service Provider and each End User. <strong>However</strong>, the SPA explicitly allows this to be <strong>indirect through an intermediary</strong> — meaning each SME contracts with <strong>us</strong>, and we contract with Stormware. Stormware chooses to contract directly rather than through intermediaries, which is their business decision, not a Peppol mandate.</td>
+    <td><span class="badge" style="background:#f59e0b;">⚡ Partially Stormware's choice</span><br>Contract needed, but can go through us as intermediary. Stormware chooses direct contracts.</td>
   </tr>
   <tr>
     <td><strong>Communication tokens tied to specific IČO</strong></td>
@@ -162,22 +162,28 @@
 </table>
 
 <div class="info">
-  <strong>🔑 The key distinction:</strong>
+  <strong>🔑 The full picture — after checking PA SK, Peppol SPA, and Stormware:</strong>
   <pre style="font-size:0.85em; margin:0.5em 0;">
 LEGAL REQUIREMENT (must):
   Each SME → Peppol ID 0245:DIČ → registered in central SK SMP
   Each invoice → identifies the actual SME sender/receiver
 
-STORMWARE'S INTERPRETATION (their choice):
-  Each SME → separate paper contract + individual token + consent
+PEPPOL SPA 9.2 REQUIREMENT:
+  Each SME → contractual relationship with Service Provider
+           → EITHER directly OR indirectly through an intermediary
+           → In our case: SME → us → Tickstar (indirect is fine)
 
-YOUR OPTION (also valid):
-  Each SME → Peppol ID 0245:DIČ → registered in central SK SMP
-           → clickwrap T&Cs during self-service onboarding
-           → accounting firm manages via API with per-SME delegation
-           → No separate paper contract needed per SME
+STORMWARE'S INTERPRETATION (their business choice):
+  Each SME → separate paper contract directly with Stormware
+           → individual IČO-bound token (their technical design)
+
+YOUR OPTION (also valid per Peppol SPA):
+  Each SME → contract with us (clickwrap T&Cs)
+           → us (intermediary) → contract with white-label AP
+           → Per-SME Peppol ID 0245:DIČ in central SK SMP
+           → Accounting firm uses our API with delegation per SME
   </pre>
-  <p style="margin:0.3em 0 0 0;">The only non-negotiable: each SME must have their own <code>0245:DIČ</code> participant ID in the centralised Slovak SMP. You cannot batch multiple SMEs under one ID.</p>
+  <p style="margin:0.3em 0 0 0;">The non-negotiable: each SME must have their own <code>0245:DIČ</code> participant ID in the centralised Slovak SMP, and <strong>someone</strong> must have a contractual relationship with them (directly or indirectly). The indirect model via us as intermediary is <strong>explicitly allowed</strong> by the Peppol SPA.</p>
 </div>
 
 <h2>3. White-Label Provider Comparison</h2>
@@ -397,7 +403,8 @@ YOUR OPTION (also valid):
   <strong>🤫 Strategic note — what to reveal vs what to keep internal:</strong>
   <p>Position yourself as an <strong>accounting / software service provider</strong> looking for a reliable Peppol AP partner for your ongoing business. <strong>Do not mention</strong> that you plan to operate your own certified AP in the future — this would give providers no incentive to offer good pricing, invest in onboarding, or support SMP portability.</p>
   <p>The migration path questions (Section 8) should be framed as <strong>standard business continuity planning</strong> — "what happens if we want to switch providers in the future" — not as "we're building our own AP and leaving." Every professional customer asks about data export and provider switching. It's a normal procurement question.</p>
-  <p>What matters contractually is <strong>short cancellation terms</strong> (monthly or quarterly). If you have a 30-day cancellation clause, you can leave whenever you want regardless of what you said in the introductory email. The contract is what binds you, not the sales pitch.</p>
+  <p><strong>Showing Peppol knowledge is good — showing ambition to replace them is not.</strong> It’s fine to reference the Peppol SPA (e.g. "we understand the Peppol Service Provider Agreement framework") — this signals we’re serious, professional buyers who understand the network. But keep the framing: we’re an intermediary serving our clients, and we need a reliable AP partner to do that.</p>
+<p>What matters contractually is <strong>short cancellation terms</strong> (monthly or quarterly). If you have a 30-day cancellation clause, you can leave whenever you want regardless of what you said in the introductory email. The contract is what binds you, not the sales pitch.</p>
 </div>
 
 <h2>6. Complete Communication to a White-Label Provider</h2>
@@ -416,6 +423,11 @@ accounting and software services to Slovak SMEs. With the
 1 January 2027 B2B e-invoicing mandate approaching, we are
 looking for a reliable Peppol Access Point partner to offer
 Peppol connectivity to our clients under our own brand.
+
+We understand the Peppol Service Provider Agreement
+framework and the role of intermediaries in the Peppol
+network. We are looking for a partner who supports this
+operational model.
 
 We are building an API-first service platform and need
 a white-label AP solution that we can integrate with and
@@ -479,6 +491,9 @@ Please find our detailed requirements below.
   • Limits on number of participants?
 
   3.3 Contractual Model
+  • Do you operate an intermediary / reseller / partner
+    model where we (as intermediary) contract with our
+    end customers and you contract with us?
   • Do you require a separate contract between your
     company and each end SME, or can we handle KYC
     and contracting with our end customers directly?

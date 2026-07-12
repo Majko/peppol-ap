@@ -447,7 +447,99 @@
   </tr>
 </table>
 
-<h2>8. Week-by-Week Action Plan (What to Do Now)</h2>
+</table>
+
+<h2>8. SPA Operational Obligations — What You're Signing Up For</h2>
+
+<p>The Peppol Service Provider Agreement (SPA) v4.0.2 is the contract we will sign with PA SK upon accreditation. It contains <strong>binding operational obligations</strong> that directly affect our AP implementation. These are not optional — they are contractual requirements.</p>
+
+<table>
+  <tr><th>SPA Clause</th><th>Requirement</th><th>Impact on our AP</th><th>Priority</th></tr>
+  <tr>
+    <td><strong>9.4.2 — Logging</strong></td>
+    <td>Log all sending and receiving of business documents. Logs must be kept for <strong>at least 3 months</strong> (or longer if required by law). Must provide log access to other APs and PA SK on reasonable request.</td>
+    <td>Our in-memory <code>Map</code> transactions store is insufficient. We MUST implement persistent storage (Slice 2 — SQLite adapter) with minimum 90-day retention before accreditation.</td>
+    <td><span class="badge" style="background:#dc2626;">Critical</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.4.3 — Backup &amp; Continuity</strong></td>
+    <td>Must have <strong>backup, continuity and recovery procedures</strong> in place for all Peppol Services.</td>
+    <td>Active-active multi-region architecture (Lesson 6) and documented DR plan. Database backups with tested recovery. This is a contractual requirement, not just good practice.</td>
+    <td><span class="badge" style="background:#dc2626;">Critical</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.4.9 — Capacity &amp; Scaling</strong></td>
+    <td>Must have sufficient resources. If minimum service levels cannot be met due to insufficient capacity, <strong>must scale systems</strong> appropriately.</td>
+    <td>Our capacity planning model (Lesson 6) must be documented and tracked. Auto-scaling or ability to provision additional capacity within SLA window.</td>
+    <td><span class="badge" style="background:#dc2626;">Critical</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.4.1 — Testing</strong></td>
+    <td>Must perform testing to ensure service offerings comply with Peppol Interoperability Framework and PA-specific requirements.</td>
+    <td>Testbed is just the start. We need ongoing regression testing whenever we update AP software. This should be automated.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.4.4 — Alerts &amp; Migration</strong></td>
+    <td>Must monitor OpenPeppol alerts, warnings, and hot-fixes. Must adhere to published migration plans and mandated dates.</td>
+    <td>We need an operational process to track OpenPeppol communications. Missing a PKI migration deadline means losing network access.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.4.5 — Support Services</strong></td>
+    <td>Must provide: setup/support to end users, published contact email + phone for incident reporting, incident response, subscription to service messages.</td>
+    <td>We need a support email address, phone number, and a status page before going live. Documented response times in our SLA.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.4.8 — Reporting (EUSR + TSR)</strong></td>
+    <td>Must submit monthly End User Statistics Report and Transaction Statistics Report to OpenPeppol in their defined format.</td>
+    <td>Our transaction store must support aggregation queries for monthly reporting. Tickstar offers this as add-on. For our own AP we need a reporting module.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>9.5.3 — Document Validation</strong></td>
+    <td>Must ensure datasets sent on behalf of end users are <strong>technically correct and valid</strong> according to the relevant Peppol Dataset Type rules.</td>
+    <td>Our 15-rule validator is a good start but must be expanded to full BIS Billing 3.0 Schematron. Without it we risk sending invalid invoices and being non-compliant.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>10.3 / 17.1 — Security</strong></td>
+    <td>Must implement appropriate technical and organisational measures to protect integrity and continuous operation. Protect against accidental loss, alteration, unauthorised access.</td>
+    <td>HMAC webhook signing (Issue 007), encrypted cert storage, access controls, security documentation. Must provide security documentation to PA SK on request.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>10.5 — Breach Notification</strong></td>
+    <td>Must notify PA SK <strong>without delay</strong> about data breaches, disturbances, or errors that may endanger the Peppol Network.</td>
+    <td>We need an incident response plan with defined notification procedures. Breach notification is a contractual obligation.</td>
+    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+  </tr>
+  <tr>
+    <td><strong>22.2 — Termination</strong></td>
+    <td>Either party may terminate with <strong>6 months written notice</strong>.</td>
+    <td>We must plan for this in our business model. If we cease AP operations we have 6 months to transition all participants.</td>
+    <td><span class="badge" style="background:#10b981;">Medium</span></td>
+  </tr>
+  <tr>
+    <td><strong>16 — Data Ownership</strong></td>
+    <td>End users retain all IP rights to their data. AP must not claim ownership. Data cannot be shared with third parties except as required for Peppol operation or as agreed with end user.</td>
+    <td>Our terms of service must clearly state this. We must ensure our data processing agreements reflect this.</td>
+    <td><span class="badge" style="background:#10b981;">Medium</span></td>
+  </tr>
+  <tr>
+    <td><strong>19.3 — Liability Cap</strong></td>
+    <td>Liability capped at <strong>€500,000 per event</strong>, €1,000,000 annual maximum. No liability for indirect damages (except breach of confidentiality).</td>
+    <td>Our customer contracts should reference this limit. We should not accept higher liability than we have from OpenPeppol.</td>
+    <td><span class="badge" style="background:#10b981;">Medium</span></td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>📋 Key takeaway:</strong> The SPA converts what might seem like "good engineering practice" into <strong>binding contractual obligations</strong>. The persistent transaction store (Slice 2), multi-region DR architecture (Lesson 6), HMAC webhook signing (Issue 007), and expanded UBL validator are not optional features — they are requirements for accreditation. Every item in "Critical" and "High" priority rows above should be completed <strong>before</strong> we sign the SPA.
+</div>
+
+<h2>9. Week-by-Week Action Plan (What to Do Now)</h2>
 
 <h3>Week 1 — Immediate actions (this week)</h3>
 <table>
@@ -497,7 +589,7 @@
   <tr><td>6. ENTER PRODUCTION 🚀</td><td>Register your first participant. Send your first real Peppol invoice.</td></tr>
 </table>
 
-<h2>9. Fallback Options If We Don't Make the Deadline</h2>
+<h2>10. Fallback Options If We Don't Make the Deadline</h2>
 
 <p>Even in the worst case (certification delayed past January 2027), there are options:</p>
 
@@ -517,7 +609,7 @@
 <h3>Option 3: Partnership with a Slovak certified provider</h3>
 <p>Partner with one of the 36 already-certified Slovak CPDS providers. They handle the Peppol transport; you handle the customer-facing API and portal. This is essentially a revenue-share model. Lower margin, but zero certification risk.</p>
 
-<h2>10. Summary</h2>
+<h2>11. Summary</h2>
 
 <table>
   <tr><th>Question</th><th>Answer</th></tr>
@@ -591,6 +683,7 @@
   <li><a href="https://peppol.org/tools-support/testbed/">Peppol Testbed</a></li>
   <li><a href="https://openpeppol.atlassian.net/servicedesk/customer/portal/1">Peppol Service Desk</a></li>
   <li><a href="0007-competitive-analysis-pricing-business-case.html">Lesson 7: Competitive Analysis, Pricing &amp; Business Case</a></li>
+  <li><a href="https://peppol.agid.gov.it/attachments/PeppolServiceProviderAgreement_v4.0.2_AGID_update_final.pdf">Peppol Service Provider Agreement v4.0.2</a></li>
   <li><a href="0006-infrastructure-redundancy-and-operations.html">Lesson 6: Infrastructure Redundancy &amp; Operations</a></li>
 </ul>
 

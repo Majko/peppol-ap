@@ -13,7 +13,7 @@ export const sampleInvoiceData = {
 
   seller: {
     endpointID: 'SK2023456789',
-    endpointSchemeID: '9914',
+    endpointSchemeID: 'iso6523-actorid-upis',
     name: 'Pekáreň Pod Hradom s.r.o.',
     streetName: 'Hlavná 15',
     cityName: 'Bratislava',
@@ -26,7 +26,7 @@ export const sampleInvoiceData = {
 
   buyer: {
     endpointID: 'SK4498765432',
-    endpointSchemeID: '9914',
+    endpointSchemeID: 'iso6523-actorid-upis',
     name: 'Mesto Trnava',
     streetName: 'Trojičné námestie 1',
     cityName: 'Trnava',

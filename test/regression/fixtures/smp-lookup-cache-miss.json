@@ -1,0 +1,14 @@
+{
+  "name": "smp-lookup-cache-miss",
+  "description": "SMP lookup — cache miss, returns simulated result in simulation mode",
+  "category": "smp",
+  "input": {
+    "participantId": "9914:SK0000000001"
+  },
+  "expected": {
+    "error": false,
+    "participantId": "9914:SK0000000001",
+    "simulated": true,
+    "messageId": { "present": true }
+  }
+}

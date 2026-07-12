@@ -1,0 +1,25 @@
+{
+  "name": "webhook-delivery-success",
+  "description": "Webhook delivery — webhook is registered and message is processed (actual HTTP delivery skipped in harness)",
+  "category": "webhook",
+  "input": {
+    "senderId": "0088:SK4498765432",
+    "receiverId": "9914:SK2023456789",
+    "webhookUrl": "http://localhost:9/api/webhook/test-regression",
+    "webhookSecret": "test-secret-123",
+    "payload": {
+      "id": "FA-2026-0099",
+      "issueDate": "2026-07-01",
+      "invoiceTypeCode": "380",
+      "currencyCode": "EUR",
+      "seller": { "endpointID": "SK4498765432", "endpointSchemeID": "0088", "name": "Sender Corp", "cityName": "Trnava", "countryCode": "SK" },
+      "buyer": { "endpointID": "SK2023456789", "endpointSchemeID": "9914", "name": "Receiver Corp", "cityName": "Bratislava", "countryCode": "SK" },
+      "vatBreakdown": [{ "taxableAmount": 500.0, "taxAmount": 115.0, "category": "S", "rate": 23.0 }],
+      "monetaryTotal": { "lineExtensionAmount": 500.0, "taxExclusiveAmount": 500.0, "taxInclusiveAmount": 615.0, "payableAmount": 615.0 },
+      "lines": [{ "id": 1, "quantity": 1, "unitCode": "X", "lineExtensionAmount": 500.0, "itemName": "Test Item", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 500.0 }]
+    }
+  },
+  "expected": {
+    "messageId": { "present": true }
+  }
+}

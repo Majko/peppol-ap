@@ -68,6 +68,7 @@ export function parseUBL(xmlString) {
     id: getVal(invoice, 'cbc:ID') || '',
     issueDate: getVal(invoice, 'cbc:IssueDate') || '',
     dueDate: getVal(invoice, 'cbc:DueDate') || '',
+    taxPointDate: getVal(invoice, 'cbc:TaxPointDate') || '',
     invoiceTypeCode: getVal(invoice, 'cbc:InvoiceTypeCode') || '380',
     currencyCode: getVal(invoice, 'cbc:DocumentCurrencyCode') || 'EUR',
     buyerReference: getVal(invoice, 'cbc:BuyerReference') || '',
@@ -75,6 +76,15 @@ export function parseUBL(xmlString) {
     profileID: getVal(invoice, 'cbc:ProfileID') || '',
     isCreditNote,
   };
+
+  // Extract InvoicePeriod if present
+  const invoicePeriod = getVal(invoice, 'cac:InvoicePeriod');
+  if (invoicePeriod) {
+    result.invoicePeriod = {
+      startDate: getVal(invoicePeriod, 'cbc:StartDate') || '',
+      endDate: getVal(invoicePeriod, 'cbc:EndDate') || '',
+    };
+  }
 
   // Extract seller (AccountingSupplierParty)
   const supplierParty = getVal(invoice, 'cac:AccountingSupplierParty', 'cac:Party');

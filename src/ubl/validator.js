@@ -365,6 +365,29 @@ export function validateUBL(xmlString) {
           )
         );
       }
+
+      // G08: unitCode warning — warn (don't reject) if not in UN/ECE Rec 20
+      const REC20_UNITS = new Set([
+        'C62', 'KGM', 'DAY', 'HUR', 'MTR', 'MTQ', 'LTR', 'MTR', 'MTQ', 'LTR',
+        'GM', 'KG', 'TNE', 'LC', 'MTR', 'SMI', 'KTM', 'KWH', 'MWH', 'DAY',
+        'HUR', 'MIN', 'SEC', 'KEL', 'MOL', 'RAD', 'SEC', 'MTR', 'M2', 'M3',
+        'MGM', 'MLT', 'PAL', 'PCT', 'REM', 'GRM', 'TON', 'BBL', 'GLI', 'GLL',
+        'KMA', 'KMB', 'KMC', 'KMI', 'KMK', 'LTR', 'MTR', 'MTK', 'MTQ', 'MTR',
+        'MTK', 'MTQ', 'TNE', 'TQI', 'TQP', 'MLT', 'DMA', 'DMT', 'DMR', 'DMK',
+        'DPC', 'DPR', 'DPC', 'DPP', 'LM', 'LR', 'LS', 'LW', 'DAA', 'DNA',
+        'CK', 'CN', 'CS', 'CT', 'DR', 'GD', 'GR', 'PD', 'PH', 'PR', 'PT',
+        'PXC', 'S', 'SME', 'ST', 'T', 'TNE', 'U', 'UI', 'VA', 'VQ', 'VR',
+      ]);
+      if (line.unitCode && !REC20_UNITS.has(line.unitCode)) {
+        errors.push(
+          makeError(
+            'G08',
+            'warning',
+            `unitCode '${line.unitCode}' is not in UN/ECE Rec 20 list`,
+            `/Invoice/cac:InvoiceLine[${index}]/cbc:InvoicedQuantity`
+          )
+        );
+      }
     }
   }
 

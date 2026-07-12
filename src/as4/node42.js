@@ -15,6 +15,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
+import { CertExpiredError } from '../errors.js';
 
 // Lazy import — avoids top-level await interfering with Node.js event loop
 // when server/index.js is the entry point.
@@ -41,6 +42,13 @@ export function getCertPaths() {
     key: path.join(certsDir, 'key.pem'),
     truststore: path.join(certsDir, 'truststore.pem'),
   };
+}
+
+// ── Default truststore path (configurable via AP_CORE_TRUSTSTORE_PATH) ──────────
+
+export function getDefaultTruststorePath() {
+  return process.env.AP_CORE_TRUSTSTORE_PATH ||
+    path.join(getCertsDir(), 'truststore.pem');
 }
 
 // ── Participant Lookup (public API: lookupParticipant) ────────────────────────
@@ -96,34 +104,58 @@ export async function lookupParticipant(participantId, opts = {}) {
 
 /**
  * Send a document via AS4 using Node42's public sendDocument().
- * Requires valid Peppol PKI certificates in ~/.node42/certs/.
  *
- * When PKI certs are in place, this replaces our entire custom send pipeline.
- * Until then, use the simulator or our custom buildAS4Message for development.
+ * @param {string} sbdhXml  - The SBDH-wrapped XML payload
+ * @param {Object} opts
+ * @param {string}   opts.certPem      - Certificate PEM string (loaded from identity store)
+ * @param {string}   opts.keyPem       - Private key PEM string
+ * @param {string}   [opts.truststorePath] - Path to truststore PEM file (default: ~/.node42/certs/truststore.pem)
+ * @param {string}   [opts.certId]     - Cert ID for expiry error messages
+ * @param {string}   [opts.expiresAt]  - ISO-8601 expiry timestamp (checked before send)
+ * @param {string}   [opts.env='test'] - Peppol environment
+ * @param {boolean}  [opts.dryrun=false] - Skip actual network send
+ * @param {boolean}  [opts.verbose=false]
  */
 export async function sendViaNode42(sbdhXml, opts = {}) {
-  const certPaths = getCertPaths();
   const {
-    cert = certPaths.cert,
-    key = certPaths.key,
-    truststore = certPaths.truststore,
+    certPem,
+    keyPem,
+    truststorePath,
+    certId = 'unknown',
+    expiresAt,
     env = 'test',
     dryrun = false,
+    verbose = false,
   } = opts;
 
-  for (const [name, p] of [['Certificate', cert], ['Private key', key], ['Truststore', truststore]]) {
-    if (!fs.existsSync(p)) {
-      throw new Error(`${name} not found at ${p}. Run 'n42-edelivery init' first.`);
+  if (!certPem) {
+    throw new Error('certPem is required for AS4 send');
+  }
+  if (!keyPem) {
+    throw new Error('keyPem is required for AS4 send');
+  }
+
+  // Cert expiry check — reject expired certs before attempting any network call
+  if (expiresAt) {
+    const expiry = new Date(expiresAt);
+    if (expiry <= new Date()) {
+      throw new CertExpiredError(certId, expiresAt);
     }
   }
 
+  const effectiveTruststore = truststorePath || getDefaultTruststorePath();
+
   const n42mod = await n42();
   const ctx = new n42mod.N42Context({
-    cert, key,
-    truststore: fs.readFileSync(truststore, 'utf-8'),
-    env, dryrun,
+    certPem,
+    keyPem,
+    truststore: fs.existsSync(effectiveTruststore)
+      ? fs.readFileSync(effectiveTruststore, 'utf-8')
+      : '',
+    env,
+    dryrun,
     timeout: 20000,
-    verbose: opts.verbose || false,
+    verbose,
   });
 
   const result = await n42mod.sendDocument(ctx, Buffer.from(sbdhXml, 'utf-8'));
@@ -137,7 +169,7 @@ export async function sendViaNode42(sbdhXml, opts = {}) {
     senderId: result.senderId,
     receiverId: result.receiverId,
     timestamp: result.timestamp,
-    dryrun: result.dryrun || false,
+    dryrun: result.dryrun ?? dryrun,
   };
 }
 

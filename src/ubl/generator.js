@@ -62,7 +62,7 @@ function buildSeller(seller) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyTaxScheme>
-        <cbc:CompanyID>${esc(seller.vatID || seller.endpointID)}</cbc:CompanyID>
+        ${seller.vatID ? `<cbc:CompanyID>${esc(seller.vatID)}</cbc:CompanyID>` : ''}
         <cac:TaxScheme>
           <cbc:ID>VAT</cbc:ID>
         </cac:TaxScheme>
@@ -99,7 +99,7 @@ function buildBuyer(buyer) {
         </cac:Country>
       </cac:PostalAddress>
       <cac:PartyTaxScheme>
-        <cbc:CompanyID>${esc(buyer.vatID || buyer.endpointID)}</cbc:CompanyID>
+        ${buyer.vatID ? `<cbc:CompanyID>${esc(buyer.vatID)}</cbc:CompanyID>` : ''}
         <cac:TaxScheme>
           <cbc:ID>VAT</cbc:ID>
         </cac:TaxScheme>

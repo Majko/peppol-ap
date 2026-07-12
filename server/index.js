@@ -16,9 +16,11 @@
  *   app.listen(3001);
  *
  * Environment variables:
- *   PORT          - Server port (default: 3001)
- *   PEPPOL_AP_ID  - AP identifier (default: POP000001)
- *   PEPPOL_MODE   - 'test' or 'production' (default: test)
+ *   PORT              - Server port (default: 3001)
+ *   PEPPOL_AP_ID      - AP identifier (default: POP000001)
+ *   PEPPOL_MODE       - 'test' or 'production' (default: test)
+ *   AP_CORE_DRY_RUN   - Set to 'true' to skip actual network send (default: false)
+ *   AP_CORE_TRUSTSTORE_PATH - Path to truststore PEM (default: ~/.node42/certs/truststore.pem)
  */
 
 import express from 'express';
@@ -28,7 +30,10 @@ import * as simulator from '../src/simulator.js';
 import { generateInvoice, generateCreditNote } from '../src/ubl/generator.js';
 import { parseUBL } from '../src/ubl/parser.js';
 import { buildSBDH } from '../src/as4/sbdh.js';
-import { buildAS4Message } from '../src/as4/message.js';
+import { buildAS4Message, buildAS4Error, EbMSErrorCodes } from '../src/as4/message.js';
+import { getMetrics } from '../src/middleware/metrics.js';
+import { generateMonthlyReport } from '../src/reporting/monthly-report.js';
+import { checkCertExpiry } from '../src/monitoring/cert-monitor.js';
 // Inline sample data (avoids importing test fixtures in production)
 const sampleInvoiceData = {
   id: 'FA-2026-9999', issueDate: '2026-07-03', invoiceTypeCode: '380', currencyCode: 'EUR',
@@ -65,8 +70,35 @@ export function createApp() {
 
   // ─── Health & Info ────────────────────────────
 
-  app.get('/api/health', (_req, res) => {
-    res.json(apCore.getHealth());
+  app.get('/api/health', async (_req, res) => {
+    const health = await apCore.getHealth();
+    res.json(health);
+  });
+
+  app.get('/api/health/detailed', async (_req, res) => {
+    const health = await apCore.getHealth();
+    res.json(health);
+  });
+
+  app.get('/api/health/certs', async (_req, res) => {
+    try {
+      const warningDays = parseInt(_req.query.warningDays ?? '30', 10);
+      const criticalDays = parseInt(_req.query.criticalDays ?? '7', 10);
+      const alerts = await checkCertExpiry(apCore._getStores().identityStore, { warningDays, criticalDays });
+      const worstLevel = alerts.some(a => a.level === 'critical') ? 'critical'
+        : alerts.some(a => a.level === 'warning') ? 'warning'
+        : 'ok';
+      res.json({ status: worstLevel, alerts });
+    } catch (err) {
+      console.error('GET /api/health/certs error:', err);
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
+  });
+
+  app.get('/metrics', async (_req, res) => {
+    const metrics = await getMetrics();
+    res.set('Content-Type', 'text/plain; version=0.0.4');
+    res.send(metrics);
   });
 
   app.get('/', (_req, res) => {
@@ -185,27 +217,72 @@ export function createApp() {
 
   // ─── GET /api/status/:id ──────────────────────
 
-  app.get('/api/status/:id', (req, res) => {
-    res.json(apCore.getStatus(req.params.id));
+  app.get('/api/status/:id', async (req, res) => {
+    try {
+      const result = await apCore.getStatus(req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
   });
 
   // ─── GET /api/transactions ────────────────────
 
-  app.get('/api/transactions', (_req, res) => {
-    const txs = apCore.getTransactions();
-    res.json({
-      count: txs.length,
-      transactions: txs.map((tx) => ({
-        messageId: tx.messageId,
-        direction: tx.direction,
-        status: tx.status,
-        senderId: tx.senderId,
-        receiverId: tx.receiverId,
-        documentType: tx.documentType,
-        timestamp: tx.timestamp,
-        completedAt: tx.completedAt,
-      })),
-    });
+  app.get('/api/transactions', async (_req, res) => {
+    try {
+      const txs = await apCore.getTransactions();
+      res.json({
+        count: txs.length,
+        transactions: txs.map((tx) => ({
+          messageId: tx.messageId,
+          direction: tx.direction,
+          status: tx.status,
+          senderId: tx.senderId,
+          receiverId: tx.receiverId,
+          documentType: tx.documentType,
+          timestamp: tx.timestamp,
+          completedAt: tx.completedAt,
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
+  });
+
+  // ─── GET /api/reports/monthly ────────────────
+
+  app.get('/api/reports/monthly', async (req, res) => {
+    try {
+      const { period, period_last, ap_id, country } = req.query;
+
+      if (!period) {
+        return res.status(400).json({
+          error: 'bad_request',
+          details: [{ message: 'period query parameter (YYYY-MM) is required' }],
+        });
+      }
+
+      // Validate period format
+      if (!/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({
+          error: 'bad_request',
+          details: [{ message: 'period must be in YYYY-MM format (e.g. 2026-06)' }],
+        });
+      }
+
+      const config = {
+        period,
+        apId: ap_id || process.env.PEPPOL_AP_ID || 'POP000001',
+        country: country || 'SK',
+        periodLast: period_last || null,
+      };
+
+      const report = await generateMonthlyReport(config);
+      res.json(report);
+    } catch (err) {
+      console.error('GET /api/reports/monthly error:', err);
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
   });
 
   // ─── GET /api/txs (alias) ─────────────────────
@@ -229,6 +306,58 @@ export function createApp() {
       res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
     }
   });
+
+  // ─── POST /as4/receive ────────────────────────────────────────────────────────
+  // Official AS4 receive endpoint — receives raw MIME multipart body and
+  // returns an AS4 MDN receipt (application/xop+xml) on success.
+
+  app.post(
+    '/as4/receive',
+    express.raw({ type: 'multipart/related', limit: '10mb' }),
+    async (req, res) => {
+      try {
+        const mimeMessage = req.body?.toString('utf8') || req.body;
+        if (!mimeMessage) {
+          const errorSignal = buildAS4Error(
+            EbMSErrorCodes.EB001_MESSAGE_STRUCTURE,
+            'Missing request body',
+            'The AS4 receive endpoint requires a non-empty MIME body.'
+          );
+          res.set('Content-Type', 'application/xop+xml');
+          return res.status(500).send(errorSignal);
+        }
+
+        const result = await apCore.handleIncomingMessage(mimeMessage);
+
+        // Return MDN receipt as AS4 response
+        res.set('Content-Type', 'application/xop+xml');
+        res.status(200).send(result.mdnReceipt);
+      } catch (err) {
+        console.error('POST /as4/receive error:', err);
+
+        // Determine appropriate ebMS error code based on error type
+        let errorCode = EbMSErrorCodes.EB001_MESSAGE_STRUCTURE;
+        if (err.message.includes('payload') || err.message.includes('Payload')) {
+          errorCode = EbMSErrorCodes.EB002_REQUIRED_FIELD_MISSING;
+        } else if (err.message.includes('signature') || err.message.includes('Signature')) {
+          errorCode = EbMSErrorCodes.EB007_SIGNATURE_FAILED;
+        } else if (err.message.includes('decrypt') || err.message.includes('Decrypt')) {
+          errorCode = EbMSErrorCodes.EB006_DECRYPTION_ERROR;
+        } else if (err.message.includes('expired') || err.message.includes('certificate')) {
+          errorCode = EbMSErrorCodes.EB005_CERT_EXPIRED;
+        }
+
+        const errorSignal = buildAS4Error(
+          errorCode,
+          err.message,
+          null,
+          null // refMessageId not available when parse fails
+        );
+        res.set('Content-Type', 'application/xop+xml');
+        res.status(500).send(errorSignal);
+      }
+    }
+  );
 
   // ─── POST /api/simulate/inject — Simulate incoming AS4 message ────
 
@@ -380,6 +509,8 @@ export function createApp() {
         senderId: senderId || '9914:SK2023456789',
         receiverId: receiverId || '0088:SK4498765432',
         invoiceData: invoiceData || { id: 'generated' },
+        fromApId: apCore._apId || 'POP000001',
+        toApId: 'POP000999',
         documentType,
       });
 
@@ -429,7 +560,149 @@ export function createApp() {
     }
   });
 
+  // ─── POST /api/webhook/register ────────────────
+
+  app.post('/api/webhook/register', (req, res) => {
+    try {
+      const { url, secret } = req.body;
+      if (!url) {
+        return res.status(400).json({ error: 'bad_request', details: [{ message: 'url is required' }] });
+      }
+      // WEBHOOK_SECRET env var can be used as a default secret
+      const effectiveSecret = secret || process.env.WEBHOOK_SECRET || null;
+      const result = apCore.registerWebhook({ url, secret: effectiveSecret });
+      res.json(result);
+    } catch (err) {
+      console.error('POST /api/webhook/register error:', err);
+      res.status(500).json({ error: 'internal_error', details: [{ message: err.message }] });
+    }
+  });
+
   return app;
+}
+
+// ─── Readiness state for graceful drain ─────────────────────────────────────────
+let isReady = true;
+
+/** @internal - Reset ready state between tests */
+export function _resetReady() {
+  isReady = true;
+}
+
+/** @internal - Set ready state directly (for testing) */
+export function _setReady(value) {
+  isReady = value;
+}
+
+/**
+ * Start the Express server and optionally handle graceful shutdown.
+ *
+ * @param {Object} options
+ * @param {boolean} [options.graceful=false] - If true, registers SIGTERM handler that drains
+ *        in-flight requests before exiting. Workers use this mode.
+ * @param {number} [options.port=3001] - Port to listen on
+ * @param {boolean} [options.simulation=false] - Enable simulation mode
+ */
+export function startWorker({ graceful = false, port = 3001, simulation = false } = {}) {
+  // Enable simulation mode when requested
+  if (simulation) {
+    apCore.enableSimulation();
+  }
+
+  const app = createApp();
+
+  // ── Kubernetes-compatible health probes ─────────────────────────────────────
+  // Liveness: am I alive?
+  app.get('/health/live', (_req, res) => {
+    res.json({ status: 'ok', pid: process.pid });
+  });
+
+  // Readiness: am I able to serve traffic? Returns 503 during graceful drain.
+  app.get('/health/ready', async (_req, res) => {
+    if (!isReady) {
+      return res.status(503).json({ status: 'draining', pid: process.pid });
+    }
+    // Verify store is reachable as part of readiness check
+    try {
+      const health = await apCore.getHealth();
+      const ready = health.status !== 'error';
+      if (!ready) {
+        isReady = false;
+        return res.status(503).json({ status: 'unhealthy', pid: process.pid, detail: health });
+      }
+      res.json({ status: 'ok', pid: process.pid, detail: health });
+    } catch (err) {
+      isReady = false;
+      res.status(503).json({ status: 'error', pid: process.pid, error: err.message });
+    }
+  });
+
+  const server = app.listen(port, () => {
+    const mode = simulation ? '🔄 SIMULATION' : '🌐 LIVE';
+    console.log(`
+╔══════════════════════════════════════════════════════╗
+║     🇸🇰  Peppol AP Core — ${mode.padEnd(29)}║
+║     Worker PID: ${String(process.pid).padEnd(39)}║
+╠══════════════════════════════════════════════════════╣
+║                                                      ║
+║  Server:    http://localhost:${String(port).padEnd(5)}                     ║
+║  Health:    http://localhost:${port}/api/health       ║
+║  Liveness:  http://localhost:${port}/health/live     ║
+║  Readiness: http://localhost:${port}/health/ready     ║
+║  Metrics:   http://localhost:${port}/metrics          ║
+║  Send:      POST http://localhost:${port}/api/send   ║
+║  Validate:  POST http://localhost:${port}/api/validate║
+║  Lookup:    GET  http://localhost:${port}/api/lookup/ ║
+║  Status:    GET  http://localhost:${port}/api/status/ ║
+║  TXs:       GET  http://localhost:${port}/api/txs     ║
+║  Simulate:  POST http://localhost:${port}/api/simulate/*║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
+    `);
+  });
+
+  if (graceful) {
+    // ── Graceful shutdown (worker drain) ───────────────────────────────────
+    // On SIGTERM: mark as not ready (503), stop accepting new connections,
+    // wait for in-flight to drain, then exit.
+    process.on('SIGTERM', () => {
+      console.log(`[worker] PID ${process.pid} received SIGTERM, draining...`);
+      isReady = false;
+
+      // Stop accepting new connections (existing requests keep running)
+      server.close(async () => {
+        console.log(`[worker] PID ${process.pid} server closed, closing store...`);
+
+        // Close the store (SQLite) connection
+        try {
+          const stores = await import('../src/index.js').then(m => m._getStores?.());
+          if (stores?.transactionStore?.close) {
+            await stores.transactionStore.close();
+          }
+          if (stores?.smpCache?.close) {
+            await stores.smpCache.close();
+          }
+        } catch (_) {
+          // ignore close errors
+        }
+
+        console.log(`[worker] PID ${process.pid} exiting gracefully.`);
+        process.exit(0);
+      });
+
+      // Force-exit after 30 seconds regardless
+      setTimeout(() => {
+        console.error(`[worker] PID ${process.pid} graceful drain timed out after 30s, forcing exit.`);
+        process.exit(1);
+      }, 30_000);
+    });
+  } else {
+    // ── Simple shutdown (development mode) ────────────────────────────────
+    process.on('SIGINT', () => { server.close(); process.exit(0); });
+    process.on('SIGTERM', () => { server.close(); process.exit(0); });
+  }
+
+  return { server, app };
 }
 
 // ─── Start server when run directly ──────────────
@@ -438,37 +711,6 @@ const isMain = process.argv[1]?.endsWith('server/index.js') ||
 
 if (isMain) {
   const PORT = parseInt(process.env.PORT || '3001', 10);
-
-  // Enable simulation mode when --simulate is passed
   const hasSimulate = process.argv.includes('--simulate');
-  if (hasSimulate) {
-    apCore.enableSimulation();
-  }
-
-  const app = createApp();
-  const server = app.listen(PORT, () => {
-    const mode = hasSimulate ? '🔄 SIMULATION' : '🌐 LIVE (requires Peppol network)';
-    console.log(`
-╔══════════════════════════════════════════════════════╗
-║     🇸🇰  Peppol AP Core — ${mode.padEnd(29)}║
-╠══════════════════════════════════════════════════════╣
-║                                                      ║
-║  Server:    http://localhost:${String(PORT).padEnd(5)}                     ║
-║  Health:    http://localhost:${PORT}/api/health       ║
-║  Send:      POST http://localhost:${PORT}/api/send   ║
-║  Validate:  POST http://localhost:${PORT}/api/validate║
-║  Lookup:    GET  http://localhost:${PORT}/api/lookup/ ║
-║  Status:    GET  http://localhost:${PORT}/api/status/ ║
-║  TXs:       GET  http://localhost:${PORT}/api/txs     ║
-║  Simulate:  POST http://localhost:${PORT}/api/simulate/*║
-║                                                      ║
-║  Accounting app → POST JSON/XML to /api/send         ║
-║                                                      ║
-╚══════════════════════════════════════════════════════╝
-  `);
-  });
-
-  // Graceful shutdown
-  process.on('SIGINT', () => { server.close(); process.exit(0); });
-  process.on('SIGTERM', () => { server.close(); process.exit(0); });
+  startWorker({ graceful: false, port: PORT, simulation: hasSimulate });
 }

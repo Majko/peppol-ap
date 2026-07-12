@@ -13,13 +13,23 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "verify": "node examples/verify-standalone.js",
-    "start": "node server/index.js --start",
+    "start": "node server/cluster.js",
+    "start:dev": "node server/index.js --start",
     "start:sim": "node server/index.js --start --simulate",
     "demo": "node examples/demo-accounting-app.js",
     "sim:receive": "node server/simulate.js receive",
     "sim:send": "node server/simulate.js send",
     "sim:register": "node server/simulate.js register",
-    "sim:participants": "node server/simulate.js participants"
+    "sim:participants": "node server/simulate.js participants",
+    "logs": "node bin/ap-core.js logs",
+    "logs:export": "node bin/ap-core.js logs export",
+    "logs:prune": "node bin/ap-core.js logs prune",
+    "status": "node bin/ap-core.js status",
+    "tx": "node bin/ap-core.js tx",
+    "check-certs": "node src/monitoring/cert-monitor.js",
+    "regression": "node test/regression/harness.js",
+    "test:regression": "node test/regression/harness.js",
+    "test:simulation": "node --experimental-vm-modules node_modules/vitest/vitest.mjs run test/simulation-regression.test.js"
   },
   "keywords": [
     "peppol",
@@ -40,10 +50,15 @@
   },
   "dependencies": {
     "@n42/edelivery": "^0.2.85",
+    "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "fast-xml-parser": "^5.9.3",
+    "mailparser": "^3.9.14",
+    "prom-client": "^15.1.3",
     "sax": "^1.6.0",
-    "uuid": "^14.0.1"
+    "uuid": "^14.0.1",
+    "xml-crypto": "^6.1.2",
+    "xml-encryption": "^5.0.0"
   }
 }

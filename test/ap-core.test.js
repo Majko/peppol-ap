@@ -91,26 +91,24 @@ describe('AP Core Interface', () => {
   });
 
   describe('getStatus', () => {
-    it('should return status for a known message ID', () => {
+    it('should return status for a known message ID', async () => {
       // First send a document to create a transaction
       const ublXml = generateInvoice(sampleInvoiceData);
 
-      const result = sendInvoice({
+      const sendResult = await sendInvoice({
         senderId: '9914:SK2023456789',
         receiverId: '0088:SK4498765432',
         ublXml,
       });
 
       // Now get status using the messageId from the result
-      result.then((sendResult) => {
-        const statusResult = getStatus(sendResult.messageId);
-        expect(statusResult.messageId).toBe(sendResult.messageId);
-        expect(statusResult.status).toBeDefined();
-      });
+      const statusResult = await getStatus(sendResult.messageId);
+      expect(statusResult.messageId).toBe(sendResult.messageId);
+      expect(statusResult.status).toBeDefined();
     });
 
-    it('should return failed for an unknown message ID', () => {
-      const result = getStatus('non-existent-message-id');
+    it('should return failed for an unknown message ID', async () => {
+      const result = await getStatus('non-existent-message-id');
 
       expect(result.status).toBe('failed');
       expect(result.error).toBe('Unknown message ID');
@@ -157,12 +155,119 @@ describe('AP Core Interface', () => {
   });
 
   describe('getHealth', () => {
-    it('should return health status', () => {
-      const health = getHealth();
+    it('should return health status', async () => {
+      const health = await getHealth();
 
-      expect(health.status).toBe('ok');
+      expect(health.status).toMatch(/^(ok|warning)$/);
       expect(health.version).toBe('1.0.0');
       expect(health.apId).toBeDefined();
+    });
+  });
+});
+
+// ── Production AS4 Send Path Tests ─────────────────────────────────────────────────
+
+import { resetMockStores, seedMockCert } from '../src/store/mock.js';
+import { CertExpiredError, CertNotFoundError } from '../src/errors.js';
+import * as node42 from '../src/as4/node42.js';
+
+describe('Production AS4 Send Path', () => {
+  // Each test starts fresh
+  beforeEach(() => {
+    resetMockStores();
+    // Ensure production mode (not simulation) for these tests
+    apCore.disableSimulation();
+  });
+
+  afterEach(() => {
+    // Restore simulation for other test suites
+    apCore.enableSimulation();
+  });
+
+  describe('sendInvoice — certificate loading', () => {
+    it('should throw CertNotFoundError when no active cert is in the identity store', async () => {
+      // Simulation is disabled and no cert is seeded — production path tries identityStore.getActiveCert()
+      const ublXml = generateInvoice(sampleInvoiceData);
+
+      const result = await sendInvoice({
+        senderId: '9914:SK2023456789',
+        receiverId: '0088:SK4498765432',
+        ublXml,
+      });
+
+      expect(result.status).toBe('error');
+      expect(result.error).toBe('cert_not_found');
+      expect(result.details[0].message).toBe('No active certificate found in identity store');
+    });
+
+    it('should throw CertExpiredError when the active cert has expired', async () => {
+      // Seed a cert that expired yesterday
+      const expiredCert = {
+        certId: 'expired-cert-001',
+        certPem: '-----BEGIN CERTIFICATE-----\nEXPIREDCERT\n-----END CERTIFICATE-----',
+        privKeyPem: '[REDACTED PRIVATE KEY]',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // expired 1 day ago
+      };
+      const { identityStore: store } = apCore._getStores?.() || {};
+      if (store) await store.storeCert(expiredCert);
+
+      const ublXml = generateInvoice(sampleInvoiceData);
+
+      const result = await sendInvoice({
+        senderId: '9914:SK2023456789',
+        receiverId: '0088:SK4498765432',
+        ublXml,
+      });
+
+      expect(result.status).toBe('error');
+      expect(result.error).toBe('cert_expired');
+      expect(result.details[0].message).toContain('expired at');
+    });
+
+    it('should pass cert to node42.sendViaNode42 when a valid active cert exists', async () => {
+      // Seed a valid (non-expired) cert
+      const validCert = {
+        certId: 'valid-cert-001',
+        certPem: '-----BEGIN CERTIFICATE-----\nVALIDCERT\n-----END CERTIFICATE-----',
+        privKeyPem: '-----BEGIN PRIVATE KEY-----\nVALIDKEY\n-----END PRIVATE KEY-----',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // valid for 1 year
+      };
+      const { identityStore: store } = apCore._getStores?.() || {};
+      if (store) await store.storeCert(validCert);
+
+      // Spy on node42.sendViaNode42 to verify it receives correct params
+      const originalSend = node42.sendViaNode42;
+      const spy = vi.spyOn(node42, 'sendViaNode42').mockImplementation(async () => ({
+        messageId: 'mock-msg-id',
+        status: 'sent',
+        receipt: null,
+        timestamp: new Date().toISOString(),
+        dryrun: false,
+      }));
+
+      const ublXml = generateInvoice(sampleInvoiceData);
+
+      const result = await sendInvoice({
+        senderId: '9914:SK2023456789',
+        receiverId: '0088:SK4498765432',
+        ublXml,
+      });
+
+      expect(spy).toHaveBeenCalledOnce();
+      const [sbdhXml, opts] = spy.mock.lastCall;
+      expect(opts.certPem).toBe(validCert.certPem);
+      expect(opts.keyPem).toBe(validCert.privKeyPem);
+      expect(opts.certId).toBe(validCert.certId);
+      expect(opts.expiresAt).toBe(validCert.expiresAt);
+      expect(opts.dryrun).toBe(false); // AP_CORE_DRY_RUN defaults to false
+      expect(result.status).toBe('sent');
+      expect(result.messageId).toBe('mock-msg-id');
+
+      spy.mockRestore();
     });
   });
 });

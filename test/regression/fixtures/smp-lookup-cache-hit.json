@@ -1,0 +1,29 @@
+{
+  "name": "smp-lookup-cache-hit",
+  "description": "SMP lookup — cache hit, should return cached result without re-query",
+  "category": "smp-cache-hit",
+  "input": {
+    "participantId": "9914:SK2023456789"
+  },
+  "setup": {
+    "preCache": {
+      "participantId": "9914:SK2023456789",
+      "smpUrl": "https://smp.cached.sim.local",
+      "services": [
+        {
+          "document_type": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2::Invoice##urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0::2.1",
+          "process_id": "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
+          "endpoint": "https://ap.cached.sim.local/as4",
+          "certificate": "-----BEGIN CERTIFICATE-----\nCACHEDCERT\n-----END CERTIFICATE-----"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "participantId": "9914:SK2023456789",
+    "smpUrl": "https://smp.cached.sim.local",
+    "services": { "present": true, "nonEmpty": true },
+    "cacheResult": "hit",
+    "simulated": true
+  }
+}

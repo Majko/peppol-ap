@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 11: Running a Certified AP — Operational Procedures</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #1e40af; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #2563eb; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.78em; line-height: 1.45; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #ecfdf5; border-left: 4px solid #10b981; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #047857; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: #b91c1c; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .badge { display: inline-block; background: #1e40af; color: #fff; font-size: 0.65em; padding: 0.15em 0.5em; border-radius: 3px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<h1>⚙️ Lesson 11: Running a Certified AP — Operational Procedures</h1>
+<p><em>What you must do operationally once you're a certified Peppol Service Provider.</em></p>
+
+<hr>
+
+<h2>🎯 This lesson covers</h2>
+<ul>
+  <li>What ongoing obligations does the SPA impose beyond the initial certification?</li>
+  <li>What support services must we provide to end users?</li>
+  <li>How do we handle incident response and breach notification?</li>
+  <li>What is the monthly reporting cadence (EUSR + TSR)?</li>
+  <li>How do we monitor OpenPeppol alerts and mandatory migrations?</li>
+  <li>What is the complete weekly/monthly/quarterly operational checklist?</li>
+</ul>
+
+<hr>
+
+<h2>1. The SPA's Ongoing Obligations — Overview</h2>
+
+<p>Getting certified is not the finish line — it's the starting line. The SPA v4.0.2 imposes several <strong>ongoing operational obligations</strong> that continue for as long as you're a certified AP. Unlike the one-time certification steps, these require <strong>processes, not projects.</strong></p>
+
+<table>
+  <tr><th>Obligation</th><th>SPA Clause</th><th>Cadence</th><th>Type</th></tr>
+  <tr><td>Transaction logging + retention</td><td>9.4.2</td><td>Continuous (90-day min)</td><td>Automated (Issue 011)</td></tr>
+  <tr><td>Backup, continuity, recovery</td><td>9.4.3</td><td>Quarterly DR test</td><td>Manual + automated</td></tr>
+  <tr><td>Ongoing compliance testing</td><td>9.4.1</td><td>On each deployment</td><td>Automated (Issue 009)</td></tr>
+  <tr><td>Alert monitoring</td><td>9.4.4</td><td>Weekly check</td><td>Manual process</td></tr>
+  <tr><td>Support services</td><td>9.4.5</td><td>Business hours</td><td>Operational</td></tr>
+  <tr><td>Inter-AP issue resolution</td><td>9.4.6</td><td>As needed</td><td>Operational</td></tr>
+  <tr><td>Monthly reporting (EUSR + TSR)</td><td>9.4.8</td><td>Monthly</td><td>Automated (Issue 010)</td></tr>
+  <tr><td>Capacity management</td><td>9.4.9</td><td>Monthly review</td><td>Manual + automated</td></tr>
+  <tr><td>Security measures</td><td>10.3 / 17.1</td><td>Continuous</td><td>Automated</td></tr>
+  <tr><td>Breach notification</td><td>10.5</td><td>Immediate</td><td>Manual process</td></tr>
+  <tr><td>Certificate renewal</td><td>9.4.4</td><td>Before expiry</td><td>Automated monitor (Issue 012)</td></tr>
+  <tr><td>Peppol membership renewal</td><td>9.3</td><td>Annual</td><td>Manual</td></tr>
+</table>
+
+<h2>2. Support Services (SPA 9.4.5)</h2>
+
+<p>The SPA requires that we provide:</p>
+<blockquote>a) Providing set-up and support services to its own customers,<br>
+b) Provide contact information, such as an e-mail address and telephone number, that can be used for reporting of incidents, such as system failures, security incidents or other emergency situations,<br>
+c) Responding to reported incidents, and<br>
+d) Providing for subscription to service messages (e.g., service windows).</blockquote>
+
+<h3>What we need to set up</h3>
+
+<table>
+  <tr><th>Item</th><th>Our setup</th><th>Notes</th></tr>
+  <tr>
+    <td><strong>Support email</strong></td>
+    <td><code>support@mojafaktura.sk</code></td>
+    <td>Monitored during business hours (Mon–Fri, 9:00–17:00 CET). Auto-responder with ticket ID.</td>
+  </tr>
+  <tr>
+    <td><strong>Support phone</strong></td>
+    <td>Slovak mobile number</td>
+    <td>For incident reporting (published in Annex 3 of the SPA). Can be forwarded during off-hours.</td>
+  </tr>
+  <tr>
+    <td><strong>Status page</strong></td>
+    <td><code>status.mojafaktura.sk</code></td>
+    <td>Public page showing: AS4 endpoint status, SMP status, API status. Powered by a simple health check against our <code>/health/live</code> and <code>/health/ready</code> endpoints.</td>
+  </tr>
+  <tr>
+    <td><strong>Service message subscription</strong></td>
+    <td>Mailing list</td>
+    <td>Customers subscribe to receive maintenance window notifications. We publish at least 3 days before planned maintenance.</td>
+  </tr>
+  <tr>
+    <td><strong>SLA document</strong></td>
+    <td>Published on website</td>
+    <td>Response times: critical incidents within 1 hour, major within 4 hours, minor within 24 hours.</td>
+  </tr>
+</table>
+
+<h3>Incident severity levels</h3>
+
+<table>
+  <tr><th>Severity</th><th>Definition</th><th>Response time</th><th>Example</th></tr>
+  <tr>
+    <td><span class="badge" style="background:#dc2626;">Critical</span></td>
+    <td>AP cannot send or receive any messages. Peppol network connectivity lost.</td>
+    <td><strong>1 hour</strong> (24/7)</td>
+    <td>Certificate expired, AS4 endpoint down, SMP unreachable</td>
+  </tr>
+  <tr>
+    <td><span class="badge" style="background:#f59e0b;">Major</span></td>
+    <td>Partial functionality loss. Some participants affected.</td>
+    <td><strong>4 hours</strong> (business hours)</td>
+    <td>Database issues, high latency, single region down (multi-region still serves)</td>
+  </tr>
+  <tr>
+    <td><span class="badge" style="background:#10b981;">Minor</span></td>
+    <td>Non-critical issue. Workaround available.</td>
+    <td><strong>24 hours</strong> (business hours)</td>
+    <td>Status page not updating, reporting delay, individual participant issue</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>💡 Lean start-up tip:</strong> For the first 6 months, the "support team" is you. Use a simple shared inbox (Gmail) + a free status page (Cloudflare Pages with a static HTML status template). Upgrade to a proper ticketing system (Zendesk, Freshdesk) only when volume justifies it.
+</div>
+
+<h2>3. Breach Notification (SPA 10.5)</h2>
+
+<blockquote>"The Parties shall notify each other and other implicated actors in the Peppol Network at the designated contact point in Annex 3, <strong>without delay</strong> if they observe or become aware of data breaches, disturbances or errors within their area of responsibility, which may endanger the correct functioning of the Peppol Network."</blockquote>
+
+<h3>When to notify PA SK</h3>
+<ul>
+  <li><strong>Security breach:</strong> Unauthorised access to AP systems, compromised certificates, data leak</li>
+  <li><strong>System disturbance:</strong> Extended outage (>2 hours), routing errors, message corruption</li>
+  <li><strong>Fraud/spam:</strong> Suspicious activity originating from or targeting our participants</li>
+</ul>
+
+<h3>Notification procedure</h3>
+<ol>
+  <li><strong>Immediately:</strong> Send email to <code>peppol@financnasprava.sk</code> with subject <code>[SECURITY] [Company name] - [brief description]</code></li>
+  <li><strong>Within 4 hours:</strong> Send follow-up with details: what happened, impact, actions taken, expected resolution time</li>
+  <li><strong>Within 24 hours:</strong> Send post-incident report with root cause analysis and preventive measures</li>
+  <li><strong>If fraud is confirmed:</strong> Block the affected participant per SPA 9.7</li>
+</ol>
+
+<div class="callout">
+  <strong>📋 Template for breach notification email:</strong>
+  <pre style="font-size:0.8em; margin:0.5em 0 0 0;">
+Subject: [SECURITY] Mojafaktúra s.r.o. - Certificate compromise detected
+
+We have detected that our production Peppol certificate may have been
+compromised. The certificate with ID [certId] issued to [subject] has been
+revoked effective immediately. We have requested a replacement from the
+Peppol Service Desk.
+
+Impact: Our AP cannot send or receive messages until the new certificate
+is installed. Estimated downtime: 2-4 hours.
+
+We will provide a post-incident report within 24 hours.
+  </pre>
+</div>
+
+<h2>4. Alert Monitoring (SPA 9.4.4)</h2>
+
+<p>OpenPeppol periodically publishes alerts, warnings, and migration plans that require action. Examples from recent history:</p>
+<ul>
+  <li><strong>PKI G2 → G3 migration (2025–2026):</strong> All APs had to migrate from DigiCert MPKI8 to DOTL CA chain by April 2026. Failure meant network disconnection.</li>
+  <li><strong>SML insourcing (2026):</strong> DNS lookup domains changed for all APs.</li>
+  <li><strong>BIS version updates:</strong> New Schematron rules must be implemented by mandated dates.</li>
+</ul>
+
+<h3>Monitoring process</h3>
+
+<table>
+  <tr><th>What to monitor</th><th>Where</th><th>Cadence</th></tr>
+  <tr>
+    <td>OpenPeppol member emails</td>
+    <td>Your registered member email inbox</td>
+    <td>Check daily (set up email filter for <code>@peppol.eu</code>)</td>
+  </tr>
+  <tr>
+    <td>Peppol Service Desk announcements</td>
+    <td><a href="https://openpeppol.atlassian.net/servicedesk/customer/portal/1">Service Desk Portal</a></td>
+    <td>Weekly</td>
+  </tr>
+  <tr>
+    <td>OpenPeppol Member Area (Confluence)</td>
+    <td><a href="https://openpeppol.atlassian.net/wiki/spaces/OPMA">Member Area</a></td>
+    <td>Monthly</td>
+  </tr>
+  <tr>
+    <td>Peppol eDelivery community</td>
+    <td><a href="https://peppol.org/communities/edelivery-domain-community/">Community page</a></td>
+    <td>Monthly</td>
+  </tr>
+  <tr>
+    <td>PA SK official communications</td>
+    <td><code>peppol@financnasprava.sk</code> and FS portal</td>
+    <td>Weekly (they're responsive)</td>
+  </tr>
+</table>
+
+<div class="warn">
+  <strong>⚠️ Critical rule:</strong> When a migration announcement arrives, calculate the deadline date and set a calendar reminder <strong>3 months before</strong>. Most Peppol migrations have a 6–12 month window, but providers who wait until the last month risk being rushed or missing the deadline. The G2→G3 PKI migration caught many providers off guard.
+</div>
+
+<h2>5. Monthly Reporting (SPA 9.4.8)</h2>
+
+<p>Two reports must be submitted to OpenPeppol each month:</p>
+
+<table>
+  <tr><th>Report</th><th>Content</th><th>Deadline</th><th>Implementation</th></tr>
+  <tr>
+    <td><strong>EUSR</strong><br>End User Statistics Report</td>
+    <td>Number of end users by country and document type</td>
+    <td>5th day of the following month</td>
+    <td>Issue 010 (reporting module)</td>
+  </tr>
+  <tr>
+    <td><strong>TSR</strong><br>Transaction Statistics Report</td>
+    <td>Number of transactions by direction, type, and country pair</td>
+    <td>5th day of the following month</td>
+    <td>Issue 010 (reporting module)</td>
+  </tr>
+</table>
+
+<h3>Submission method</h3>
+<p>Verify the current submission method at time of implementation — OpenPeppol may provide a web portal, API, or require email. Options include:</p>
+<ul>
+  <li>Upload via OpenPeppol member portal</li>
+  <li>Email to reporting@peppol.eu</li>
+  <li>Automated API (if available)</li>
+</ul>
+
+<h3>Reporting calendar entry</h3>
+<p>Set a recurring calendar reminder:</p>
+<ul>
+  <li><strong>1st of each month:</strong> Run report generation (<code>peppol-ap reports generate --month previous</code>)</li>
+  <li><strong>2nd of each month:</strong> Review and validate reports</li>
+  <li><strong>3rd of each month:</strong> Submit to OpenPeppol</li>
+</ul>
+
+<div class="info">
+  <strong>💡 White-label shortcut:</strong> While using Tickstar as a white-label bridge, they handle EUSR and TSR reporting for you (they offer it as an add-on service). You only need to implement this when you switch to your own AP.
+</div>
+
+<h2>6. Capacity Management (SPA 9.4.9)</h2>
+
+<blockquote>"If the minimum service levels cannot be met due to insufficient capacity, the Peppol Service Provider shall scale its systems to a level appropriate for handling the workload."</blockquote>
+
+<h3>Monthly capacity review</h3>
+<table>
+  <tr><th>Metric</th><th>Warning threshold</th><th>Action</th></tr>
+  <tr>
+    <td>CPU utilization (peak)</td>
+    <td>> 70% for 5+ minutes</td>
+    <td>Add another app server node</td>
+  </tr>
+  <tr>
+    <td>Memory utilization (peak)</td>
+    <td>> 80% for 5+ minutes</td>
+    <td>Increase instance size or add node</td>
+  </tr>
+  <tr>
+    <td>Transaction volume growth</td>
+    <td>> 20% month-over-month</td>
+    <td>Review capacity plan, order additional resources</td>
+  </tr>
+  <tr>
+    <td>AS4 response time (p99)</td>
+    <td>> 5 seconds</td>
+    <td>Investigate bottleneck (DB, network, crypto)</td>
+  </tr>
+  <tr>
+    <td>Disk usage (log retention)</td>
+    <td>> 70%</td>
+    <td>Run log prune or increase storage</td>
+  </tr>
+</table>
+
+<h2>7. DR Testing (SPA 9.4.3)</h2>
+
+<blockquote>"Having backup, continuity and recovery procedures in place for all its Peppol Services."</blockquote>
+
+<h3>Quarterly DR test plan</h3>
+<ol>
+  <li><strong>Backup verification:</strong> Restore the transaction database from backup to a staging environment. Verify data integrity.</li>
+  <li><strong>Failover test:</strong> Simulate primary region failure. Verify that traffic routes to the secondary region and all services remain operational.</li>
+  <li><strong>Certificate recovery:</strong> Simulate certificate loss. Verify that backup certificates can be loaded and the AP resumes operation.</li>
+  <li><strong>Document recovery:</strong> Simulate payload corruption. Verify that stored UBL XML can be re-delivered from archives.</li>
+</ol>
+
+<h2>8. Complete Operational Checklist</h2>
+
+<h3>Daily</h3>
+<table>
+  <tr><th style="width:40px">Done</th><th>Item</th><th>How</th></tr>
+  <tr><td>☐</td><td>Check AP health</td><td><code>curl https://ap.mojafaktura.sk/health/live</code> + <code>/health/ready</code></td></tr>
+  <tr><td>☐</td><td>Check certificate status</td><td><code>peppol-ap cert check</code> (automated via cron)</td></tr>
+  <tr><td>☐</td><td>Check OpenPeppol emails</td><td>Filter for <code>@peppol.eu</code> in inbox</td></tr>
+</table>
+
+<h3>Weekly</h3>
+<table>
+  <tr><th style="width:40px">Done</th><th>Item</th><th>How</th></tr>
+  <tr><td>☐</td><td>Review regression test results</td><td>Check CI dashboard or run <code>npm run test:regression</code></td></tr>
+  <tr><td>☐</td><td>Check Peppol Service Desk for announcements</td><td>Visit Service Desk portal</td></tr>
+  <tr><td>☐</td><td>Review transaction error logs</td><td><code>peppol-ap logs list --status error --since 7d</code></td></tr>
+  <tr><td>☐</td><td>Run log retention prune</td><td><code>peppol-ap logs prune --older-than 90</code> (cron)</td></tr>
+</table>
+
+<h3>Monthly</h3>
+<table>
+  <tr><th style="width:40px">Done</th><th>Item</th><th>How</th></tr>
+  <tr><td>☐</td><td>Generate + submit EUSR and TSR</td><td><code>peppol-ap reports generate --month previous</code></td></tr>
+  <tr><td>☐</td><td>Capacity review</td><td>Check metrics dashboard for warning thresholds</td></tr>
+  <tr><td>☐</td><td>Check OpenPeppol Member Area (Confluence)</td><td>Review for upcoming migrations or policy changes</td></tr>
+  <tr><td>☐</td><td>Invoice for monthly subscriptions</td><td>Send invoices to customers</td></tr>
+  <tr><td>☐</td><td>Verify SMP entries</td><td>Check that all participants are correctly registered</td></tr>
+</table>
+
+<h3>Quarterly</h3>
+<table>
+  <tr><th style="width:40px">Done</th><th>Item</th><th>How</th></tr>
+  <tr><td>☐</td><td>DR test</td><td>Restore from backup, test failover, document results</td></tr>
+  <tr><td>☐</td><td>Review SLA compliance</td><td>Calculate uptime percentage, compare against SLA targets</td></tr>
+  <tr><td>☐</td><td>Update runbooks</td><td>Revise incident response and operational procedures</td></tr>
+  <tr><td>☐</td><td>Security review</td><td>Check access logs, rotate API keys if needed, review firewall rules</td></tr>
+</table>
+
+<h3>Annually</h3>
+<table>
+  <tr><th style="width:40px">Done</th><th>Item</th><th>How</th></tr>
+  <tr><td>☐</td><td>Renew OpenPeppol membership</td><td>Pay annual fee (~€2,800 for AP-only certified)</td></tr>
+  <tr><td>☐</td><td>Renew Peppol PKI certificate</td><td>Request via Service Desk before expiry (monitored by Issue 012)</td></tr>
+  <tr><td>☐</td><td>Review PA SK accreditation</td><td>Accreditation certificate is valid 2 years — track renewal date</td></tr>
+  <tr><td>☐</td><td>Review T&Cs and customer contracts</td><td>Update for any regulatory or SPA changes</td></tr>
+  <tr><td>☐</td><td>Full regression test</td><td>Run full Testbed suite (not just automated subset) to ensure ongoing compliance</td></tr>
+</table>
+
+<h2>9. Key Contacts Reference</h2>
+
+<table>
+  <tr><th>Contact</th><th>Purpose</th><th>Details</th></tr>
+  <tr><td>PA SK — Formal notices</td><td>Breach notification, contractual communication</td><td><code>peppol@financnasprava.sk</code></td></tr>
+  <tr><td>PA SK — Support issues</td><td>Incidents, escalations, questions</td><td><code>peppol@financnasprava.sk</code></td></tr>
+  <tr><td>OpenPeppol Membership</td><td>Membership renewal, fee inquiries</td><td><code>membership@peppol.eu</code></td></tr>
+  <tr><td>Peppol Service Desk</td><td>PKI certificates, Testbed, technical support</td><td><a href="https://openpeppol.atlassian.net/servicedesk/customer/portal/1">Service Desk Portal</a></td></tr>
+  <tr><td>OpenPeppol — Security issues</td><td>Security incident reporting</td><td><a href="https://openpeppol.atlassian.net/servicedesk/customer/portal/1">Service Desk Portal</a></td></tr>
+  <tr><td>OpenPeppol — Reporting</td><td>EUSR + TSR submission</td><td>Verify current method at time of implementation</td></tr>
+</table>
+
+<hr>
+
+<h2>✅ You can now</h2>
+<ol>
+  <li>Set up the support channels required by SPA 9.4.5 (email, phone, status page)</li>
+  <li>Write and publish an SLA document with severity levels and response times</li>
+  <li>Follow the breach notification procedure if a security incident occurs</li>
+  <li>Execute the alert monitoring process (daily email check, weekly Service Desk review)</li>
+  <li>Run the monthly reporting cadence (EUSR + TSR by the 5th of each month)</li>
+  <li>Execute the quarterly DR test and maintain capacity plan</li>
+  <li>Follow the daily/weekly/monthly/quarterly/annual operational checklist</li>
+</ol>
+
+<h2>📚 References</h2>
+<ul>
+  <li><a href="0008-certification-roadmap.html">Lesson 8: Certification Roadmap (includes SPA obligations table)</a></li>
+  <li><a href="../issues/009-regression-test-harness.html">Issue 009: Regression test harness</a></li>
+  <li><a href="../issues/010-monthly-reporting-module.html">Issue 010: Monthly reporting module (EUSR + TSR)</a></li>
+  <li><a href="../issues/011-cli-log-commands.html">Issue 011: CLI log commands + retention management</a></li>
+  <li><a href="../issues/012-certificate-expiry-monitoring.html">Issue 012: Certificate expiry monitoring</a></li>
+  <li><a href="https://peppol.agid.gov.it/attachments/PeppolServiceProviderAgreement_v4.0.2_AGID_update_final.pdf">Peppol Service Provider Agreement v4.0.2 (full text)</a></li>
+  <li><a href="https://docs.peppol.eu/edelivery/guidelines/reporting/2024-01-15%20Peppol%20Reporting%20-%20SP%20Operational%20Guideline%20v1.0.2.pdf">Peppol Reporting — SP Operational Guideline</a></li>
+  <li><a href="https://openpeppol.atlassian.net/wiki/spaces/AF/pages/2889089036/Peppol+Agreements">Peppol Governance Framework Documentation</a></li>
+</ul>
+
+<div class="footer">
+  <p>Lesson 11 of the Peppol Service Provider series. Previous: <a href="0010-white-label-selection-and-operation.html">Lesson 10: White-Label AP Selection</a> | <a href="0008-certification-roadmap.html">Lesson 8: Certification Roadmap</a></p>
+</div>
+
+</body>
+</html>

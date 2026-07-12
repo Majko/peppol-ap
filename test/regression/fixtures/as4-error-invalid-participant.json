@@ -1,0 +1,35 @@
+{
+  "name": "as4-error-invalid-participant",
+  "description": "AS4 send to non-existent participant — in simulation mode returns delivered (no real SMP check); real production would return error. This fixture verifies simulation mode behaviour.",
+  "category": "as4-error",
+  "input": {
+    "senderId": "9914:SK2023456789",
+    "receiverId": "0088:SK0000000000",
+    "payload": {
+      "id": "FA-2026-0042",
+      "issueDate": "2026-06-15",
+      "invoiceTypeCode": "380",
+      "currencyCode": "EUR",
+      "seller": { "endpointID": "SK2023456789", "endpointSchemeID": "9914", "name": "Seller", "cityName": "Bratislava", "countryCode": "SK" },
+      "buyer": { "endpointID": "SK0000000000", "endpointSchemeID": "0088", "name": "Buyer", "cityName": "Trnava", "countryCode": "SK" },
+      "vatBreakdown": [
+        { "taxableAmount": 100.0, "taxAmount": 23.0, "category": "S", "rate": 23.0 }
+      ],
+      "monetaryTotal": {
+        "lineExtensionAmount": 100.0,
+        "taxExclusiveAmount": 100.0,
+        "taxInclusiveAmount": 123.0,
+        "payableAmount": 123.0
+      },
+      "lines": [
+        { "id": 1, "quantity": 1, "unitCode": "X", "lineExtensionAmount": 100.0, "itemName": "Item", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 100.0 }
+      ]
+    }
+  },
+  "expected": {
+    "error": false,
+    "status": "delivered",
+    "simulated": true,
+    "messageId": { "present": true }
+  }
+}

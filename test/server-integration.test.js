@@ -56,7 +56,7 @@ describe('Server Health & Info', () => {
   it('GET /api/health should return OK', async () => {
     const { status, data } = await fetchJson('/api/health');
     expect(status).toBe(200);
-    expect(data.status).toBe('ok');
+    expect(data.status).toMatch(/^(ok|warning)$/);
     expect(data.version).toBe('1.0.0');
   });
 
