@@ -189,9 +189,13 @@ describe('UBL Validator', () => {
     zeroData.monetaryTotal.lineExtensionAmount = 0;
     zeroData.monetaryTotal.taxExclusiveAmount = 0;
     zeroData.monetaryTotal.taxInclusiveAmount = 0;
+    zeroData.monetaryTotal.payableAmount = 0;
     zeroData.lines[0].lineExtensionAmount = 0;
+    zeroData.lines[1].lineExtensionAmount = 0;
     zeroData.vatBreakdown[0].taxableAmount = 0;
     zeroData.vatBreakdown[0].taxAmount = 0;
+    zeroData.vatBreakdown[1].taxableAmount = 0;
+    zeroData.vatBreakdown[1].taxAmount = 0;
     const xml = generateInvoice(zeroData);
     const result = validateUBL(xml);
 
@@ -257,10 +261,17 @@ describe('UBL Validator', () => {
 
   it('should accept zero TaxableAmount', () => {
     const zeroData = JSON.parse(JSON.stringify(sampleInvoiceData));
+    // Zero both vatBreakdown entries (fixture has S + AA categories)
     zeroData.vatBreakdown[0].taxableAmount = 0;
     zeroData.vatBreakdown[0].taxAmount = 0;
     zeroData.vatBreakdown[0].category = 'E';
     zeroData.vatBreakdown[0].rate = 0;
+    zeroData.vatBreakdown[1].taxableAmount = 0;
+    zeroData.vatBreakdown[1].taxAmount = 0;
+    zeroData.vatBreakdown[1].category = 'E';
+    zeroData.vatBreakdown[1].rate = 0;
+    zeroData.monetaryTotal.taxExclusiveAmount = 0;
+    zeroData.monetaryTotal.taxInclusiveAmount = 0;
     const xml = generateInvoice(zeroData);
     const result = validateUBL(xml);
 
@@ -276,7 +287,7 @@ describe('UBL Validator', () => {
   it('should reject seller CompanyID with invalid SK format (not SK + 10 digits)', () => {
     const badData = JSON.parse(JSON.stringify(sampleInvoiceData));
     badData.seller.countryCode = 'SK';
-    badData.seller.companyID = 'SK1234567890'; // 11 digits - invalid
+    badData.seller.companyID = 'SK123456789'; // 10 digits total (SK + 9) - invalid
     const xml = generateInvoice(badData);
     const result = validateUBL(xml);
 

@@ -542,27 +542,30 @@ export function validateUBL(xmlString) {
   const isSKTransaction = sellerCountry === 'SK' || buyerCountry === 'SK';
 
   if (isSKTransaction) {
-    // Check seller VAT ID (PartyTaxScheme/CompanyID)
-    if (doc.seller?.vatID) {
-      if (!SK_VAT_ID_REGEX.test(doc.seller.vatID)) {
+    // BR-46: Check CompanyID field for each Slovak party separately.
+    // Only validate the party whose country is SK — the other party's
+    // countryCode determines whether the rule applies to them.
+    if (sellerCountry === 'SK') {
+      const sellerId = doc.seller?.companyID || doc.seller?.vatID;
+      if (sellerId && !SK_VAT_ID_REGEX.test(sellerId)) {
         errors.push(
           makeError(
             'BR-46',
             'fatal',
-            `Seller VAT ID '${doc.seller.vatID}' does not match SK VAT ID format (expected SK + 10 digits)`,
+            `Seller CompanyID '${sellerId}' does not match SK VAT ID format (expected SK + 10 digits)`,
             '/Invoice/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'
           )
         );
       }
     }
-    // Check buyer VAT ID (PartyTaxScheme/CompanyID)
-    if (doc.buyer?.vatID) {
-      if (!SK_VAT_ID_REGEX.test(doc.buyer.vatID)) {
+    if (buyerCountry === 'SK') {
+      const buyerId = doc.buyer?.companyID || doc.buyer?.vatID;
+      if (buyerId && !SK_VAT_ID_REGEX.test(buyerId)) {
         errors.push(
           makeError(
             'BR-46',
             'fatal',
-            `Buyer VAT ID '${doc.buyer.vatID}' does not match SK VAT ID format (expected SK + 10 digits)`,
+            `Buyer CompanyID '${buyerId}' does not match SK VAT ID format (expected SK + 10 digits)`,
             '/Invoice/cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'
           )
         );

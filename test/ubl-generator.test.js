@@ -46,7 +46,7 @@ describe('UBL Generator', () => {
       expect(xml).toContain('SK2023456789');
       expect(xml).toContain('Hlavná 15');
       expect(xml).toContain('Bratislava');
-      expect(xml).toContain('SK12345678');
+      expect(xml).toContain('SK2023456789'); // companyID in PartyTaxScheme
     });
 
     it('should include buyer party information', () => {

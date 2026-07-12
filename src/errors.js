@@ -54,6 +54,21 @@ export class NonRetryableError extends Error {
 }
 
 /**
+ * Thrown when trust chain validation (OpenPeppol PKI) fails.
+ * @param {string} reason  Either 'expired' or 'not_in_pki'
+ * @param {string} [senderId]
+ */
+export class TrustChainValidationError extends Error {
+  constructor(reason, senderId) {
+    const prefix = reason === 'expired' ? 'Certificate expired' : 'Trust chain validation failed';
+    super(senderId ? `${prefix} for sender ${senderId}` : prefix);
+    this.name = 'TrustChainValidationError';
+    this.reason = reason;
+    this.senderId = senderId;
+  }
+}
+
+/**
  * Classify a raw send-error thrown by Node42 or the network layer.
  * Returns either a RetryableError or NonRetryableError with a short code.
  *

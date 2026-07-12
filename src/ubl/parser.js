@@ -96,6 +96,8 @@ export function parseUBL(xmlString) {
       legalRegistrationName:
         getVal(supplierParty, 'cac:PartyLegalEntity', 'cbc:RegistrationName') || '',
       companyID:
+        getVal(supplierParty, 'cac:PartyTaxScheme', 'cbc:CompanyID', '#text') ||
+        getVal(supplierParty, 'cac:PartyTaxScheme', 'cbc:CompanyID') ||
         getVal(supplierParty, 'cac:PartyLegalEntity', 'cbc:CompanyID', '#text') ||
         getVal(supplierParty, 'cac:PartyLegalEntity', 'cbc:CompanyID') || '',
       vatID: getVal(supplierParty, 'cac:PartyTaxScheme', 'cbc:CompanyID') || '',
@@ -117,9 +119,12 @@ export function parseUBL(xmlString) {
       legalRegistrationName:
         getVal(customerParty, 'cac:PartyLegalEntity', 'cbc:RegistrationName') || '',
       companyID:
+        getVal(customerParty, 'cac:PartyTaxScheme', 'cbc:CompanyID', '#text') ||
+        getVal(customerParty, 'cac:PartyTaxScheme', 'cbc:CompanyID') ||
         getVal(customerParty, 'cac:PartyLegalEntity', 'cbc:CompanyID', '#text') ||
         getVal(customerParty, 'cac:PartyLegalEntity', 'cbc:CompanyID') || '',
       companyIDSchemeID:
+        getVal(customerParty, 'cac:PartyTaxScheme', 'cbc:CompanyID', '@_schemeID') ||
         getVal(customerParty, 'cac:PartyLegalEntity', 'cbc:CompanyID', '@_schemeID') || '',
       vatID: getVal(customerParty, 'cac:PartyTaxScheme', 'cbc:CompanyID') || '',
       streetName: getVal(customerParty, 'cac:PostalAddress', 'cbc:StreetName') || '',
@@ -152,6 +157,8 @@ export function parseUBL(xmlString) {
         taxAmount: parseFloat(getVal(st, 'cbc:TaxAmount', '#text') || getVal(st, 'cbc:TaxAmount') || '0'),
         category: getVal(taxCategory, 'cbc:ID') || '',
         rate: parseFloat(getVal(taxCategory, 'cbc:Percent') || '0'),
+        taxExemptionReason: getVal(taxCategory, 'cbc:TaxExemptionReason') || '',
+        taxExemptionReasonCode: getVal(taxCategory, 'cbc:TaxExemptionReasonCode') || '',
       };
     });
   }

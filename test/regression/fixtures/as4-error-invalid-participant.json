@@ -10,8 +10,8 @@
       "issueDate": "2026-06-15",
       "invoiceTypeCode": "380",
       "currencyCode": "EUR",
-      "seller": { "endpointID": "SK2023456789", "endpointSchemeID": "9914", "name": "Seller", "cityName": "Bratislava", "countryCode": "SK" },
-      "buyer": { "endpointID": "SK0000000000", "endpointSchemeID": "0088", "name": "Buyer", "cityName": "Trnava", "countryCode": "SK" },
+      "seller": { "endpointID": "SK2023456789", "endpointSchemeID": "iso6523-actorid-upis", "name": "Seller", "cityName": "Bratislava", "countryCode": "SK", "companyID": "SK2023456789" },
+      "buyer": { "endpointID": "SK0000000000", "endpointSchemeID": "0088", "name": "Buyer", "cityName": "Trnava", "countryCode": "SK", "companyID": "SK0000000000" },
       "vatBreakdown": [
         { "taxableAmount": 100.0, "taxAmount": 23.0, "category": "S", "rate": 23.0 }
       ],
@@ -22,7 +22,7 @@
         "payableAmount": 123.0
       },
       "lines": [
-        { "id": 1, "quantity": 1, "unitCode": "X", "lineExtensionAmount": 100.0, "itemName": "Item", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 100.0 }
+        { "id": 1, "quantity": 1, "unitCode": "C62", "lineExtensionAmount": 100.0, "itemName": "Item", "vatCategory": "S", "vatRate": 23.0, "priceAmount": 100.0 }
       ]
     }
   },

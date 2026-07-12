@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 12: Simulation Mode — Develop Without Accreditation</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", Times, serif; line-height: 1.6; color: #333; max-width: 780px; margin: 0 auto; padding: 4em 2em; font-size: 15px; background: #fafaf8; }
+  h1, h2, h3 { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 600; line-height: 1.2; }
+  h1 { font-size: 2em; margin-top: 0; border-bottom: 2px solid #7c3aed; padding-bottom: 0.3em; color: #111; }
+  h2 { font-size: 1.4em; margin-top: 2.2em; color: #5b21b6; }
+  h3 { font-size: 1.1em; margin-top: 1.5em; color: #444; }
+  p { margin: 0.8em 0; }
+  a { color: #5b21b6; }
+  code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.88em; background: #eee; padding: 0.15em 0.4em; border-radius: 3px; }
+  pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; overflow-x: auto; font-size: 0.82em; line-height: 1.45; }
+  pre .tag { color: #89b4fa; }
+  pre .attr { color: #a6e3a1; }
+  pre .val { color: #f9e2af; }
+  pre .cm { color: #6c7086; font-style: italic; }
+  pre .k { color: #cba6f7; }
+  pre .err { color: #f38ba8; }
+  table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
+  th { background: #1e1e2e; color: #cdd6f4; padding: 0.5em 0.8em; text-align: left; border-bottom: 2px solid #333; }
+  td { padding: 0.4em 0.8em; border-bottom: 1px solid #ddd; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  .callout { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .callout strong { color: #b45309; }
+  .info { background: #f5f3ff; border-left: 4px solid #7c3aed; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .info strong { color: #5b21b6; }
+  .warn { background: #fef2f2; border-left: 4px solid #dc2626; padding: 0.8em 1em; margin: 1.2em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: #b91c1c; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+  ul, ol { margin: 0.5em 0 0.5em 1.2em; }
+  li { margin: 0.3em 0; }
+  .cmd { font-family: "SF Mono", "Fira Code", monospace; background: #1e1e2e; color: #a6e3a1; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.88em; }
+  .diagram { background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5em; margin: 1.5em 0; }
+  .diagram pre { background: #1e1e2e; color: #cdd6f4; padding: 1em; border-radius: 6px; font-size: 0.8em; }
+</style>
+</head>
+<body>
+
+<h1>🔬 Lesson 12: Simulation Mode — Develop Without Accreditation</h1>
+<p><em>How to build and test the full Peppol AP Core without a single PKI certificate, DNS lookup, or network connection.</em></p>
+
+<hr>
+
+<h2>Why simulation mode exists</h2>
+
+<p>Running a certified Peppol Access Point requires:</p>
+<ul>
+  <li>OpenPeppol membership (paid)</li>
+  <li>PKI certificates issued through the Peppol Service Desk</li>
+  <li>Network connectivity to the Peppol SML (DNS)</li>
+  <li>Peppol Testbed accreditation before going live</li>
+</ul>
+
+<p>That's fine — but it means you can't touch the code until you're accredited. Simulation mode solves this. It's a development mode that replaces every external Peppol dependency with an in-memory equivalent:</p>
+
+<table>
+  <tr><th>Real Peppol</th><th>Simulation mode</th></tr>
+  <tr><td>SML DNS lookup</td><td>Local participant registry (in-memory map)</td></tr>
+  <tr><td>SMP metadata query</td><td>Local participant registry</td></tr>
+  <tr><td>AS4 HTTP POST to receiver AP</td><td>Direct function call into receive pipeline</td></tr>
+  <tr><td>PKI signing (WSS)</td><td>Fake signature inserted</td></tr>
+  <tr><td>PKI encryption (AS4)</td><td>Payload passed through unencrypted</td></tr>
+  <tr><td>Signed MDN receipt</td><td>Fake MDN with realistic structure</td></tr>
+  <tr><td>Peppol network errors</td><td>Configurable error injection</td></tr>
+</table>
+
+<p>The entire AS4 send/receive pipeline is exercised. The only thing fake is the network layer.</p>
+
+<div class="info">
+  <strong>💡 This is not a mock.</strong> Simulation mode doesn't skip the validation pipeline, the SBDH assembly, the AS4 message structure, or the MDN receipt generation. It runs the real code paths — only the transport layer is replaced.
+</div>
+
+<h2>How it works</h2>
+
+<p>The simulation is controlled by the <code>simulationMode</code> flag in <code>src/simulation.js</code>. When set, three things happen:</p>
+
+<ol>
+  <li><strong>Send path</strong> — <code>sendInvoice()</code> detects simulation mode and calls <code>simulator.simulateSend()</code> instead of making a real AS4 HTTP POST</li>
+  <li><strong>Receive path</strong> — <code>POST /api/simulate/inject</code> calls <code>receiveWebhook()</code> directly with a simulated incoming AS4 message</li>
+  <li><strong>Participant resolution</strong> — <code>lookupParticipant()</code> hits an in-memory registry instead of querying the SML/SMP</li>
+</ol>
+
+<div class="diagram">
+  <strong>Simulation mode data flow</strong>
+  <pre><span class="cm"># Sending an invoice</span>
+<span class="k">POST /api/send</span>
+  → sendInvoice({ simulationMode: true })
+    → simulator.simulateSend()        <span class="cm"># fake AS4 POST</span>
+      → validateUBL()                  <span class="cm"># real Schematron</span>
+      → buildSBDH()                    <span class="cm"># real SBDH assembly</span>
+      → buildAS4Message()              <span class="cm"># real message structure</span>
+      → simulator.fakeMdnReceipt()    <span class="cm"># fake but realistic MDN</span>
+    → returns MDN receipt
+
+<span class="cm"># Receiving an invoice (simulated inbound)</span>
+<span class="k">POST /api/simulate/inject</span>
+  → simulator.fakeIncomingMessage()   <span class="cm"># build fake AS4 message</span>
+    → receiveWebhook()                <span class="cm"># real receive pipeline</span>
+      → parseAS4Message()              <span class="cm"># real parsing</span>
+      → validateUBL()                  <span class="cm"># real Schematron</span>
+      → storeTransaction()             <span class="cm"># real DB write</span>
+      → simulator.fakeMdnReceipt()     <span class="cm"># fake MDN back to sender</span>
+    → returns MDN receipt</pre>
+</div>
+
+<h2>Enabling simulation mode</h2>
+
+<p>The server reads <code>SIMULATION_MODE</code> from the environment. In the dev server, it's set automatically when you use <code>npm run start:sim</code>:</p>
+
+<pre><span class="cm"># The npm script sets SIMULATION_MODE=true and NODE_ENV=development</span>
+<span class="k">npm run start:sim</span>
+
+<span class="cm"># Equivalent to setting these env vars manually:</span>
+<span class="k">SIMULATION_MODE=true NODE_ENV=development node server/index.js</span></pre>
+
+<p>To check whether the server is running in simulation mode:</p>
+
+<pre><span class="k">curl http://localhost:3001/api/health</span>
+<span class="cm"># Returns: { "status": "ok", "simulationMode": true, ... }</span></pre>
+
+<div class="warn">
+  <strong>⚠ Never set <code>SIMULATION_MODE=true</code> in production.</strong> It disables certificate verification and certificate hostname checks. The <code>npm start</code> script does not set it.
+</div>
+
+<h2>The simulated participant registry</h2>
+
+<p>When simulation mode starts, it pre-loads a set of known test participants. You can register your own:</p>
+
+<pre><span class="cm"># Register a new participant in the simulated network</span>
+<span class="k">curl -s -X POST http://localhost:3001/api/simulate/participants \
+  -H "Content-Type: application/json" \
+  -d '{"id": "9914:SK1122334455", "name": "Test Supplier s.r.o."}'</span>
+
+<span class="cm"># List all known participants</span>
+<span class="k">curl -s http://localhost:3001/api/simulate/participants | python3 -m json.tool</span></pre>
+
+<p>The registry is in-memory only — it resets when the server restarts. To pre-seed it on every start, edit <code>src/simulator.js</code> and add entries to the <code>participants</code> map.</p>
+
+<h2>Simulation via the CLI tool</h2>
+
+<p>The <code>server/simulate.js</code> CLI wraps the same simulation operations:</p>
+
+<pre><span class="k">node server/simulate.js --help</span>
+<span class="cm"># Usage: node simulate.js &lt;command&gt; [options]
+#
+# Commands:
+#   inbound     Simulate receiving an AS4 message from another AP
+#   send        Smoke-test sending with auto-generated invoice data
+#   register    Add a participant to the simulated network
+#   participants  List all participants in the simulated network</span></pre>
+
+<h3>Simulate an inbound message from another AP</h3>
+
+<pre><span class="k">node server/simulate.js inbound --sender 9914:SK5599887766 --amount 1500</span>
+<span class="cm"># Builds a fake AS4 message from SK5599887766 to this AP
+# Runs it through the full receive pipeline
+# Stores the transaction and returns the MDN</span></pre>
+
+<h3>Smoke-test sending with auto-generated data</h3>
+
+<pre><span class="k">node server/simulate.js send --to 9914:SK4498765432 --amount 2500</span>
+<span class="cm"># Auto-generates a realistic invoice
+# Validates it, builds AS4 message
+# Returns a simulated MDN receipt</span></pre>
+
+<h3>Register a trading partner</h3>
+
+<pre><span class="k">node server/simulate.js register 9914:SK1122334455 --name "Nový dodávateľ s.r.o."</span></pre>
+
+<h2>Writing simulation-aware tests</h2>
+
+<p>Tests that use simulation mode are fast, deterministic, and require no network. Use <code>enableSimulation()</code> from <code>src/simulation.js</code> to activate it in your test setup:</p>
+
+<pre><span class="k">import</span> { enableSimulation } <span class="k">from</span> <span class="val">'../src/simulation.js'</span><span class="err">;</span>
+
+<span class="k">beforeEach</span>(() => {
+  enableSimulation()<span class="err">;</span>  <span class="cm">// activates simulation mode for all send/receive calls</span>
+})<span class="err">;</span>
+
+<span class="k">it</span>(<span class="val">'validates and sends an invoice in simulation mode'</span>, <span class="k">async</span> () => {
+  <span class="k">const</span> result = <span class="k">await</span> sendInvoice({ senderId, receiverId, ublXml })<span class="err">;</span>
+  expect(result.mdn).toBeDefined()<span class="err">;</span>
+  expect(result.simulation).toBe(<span class="k">true</span>)<span class="err">;</span>
+})<span class="err">;</span></pre>
+
+<p>The regression test suite (<code>test/regression/</code>) uses simulation mode to test the full send/receive cycle against fixture files — no network, no certificates, no flakiness.</p>
+
+<h2>What you can and can't test in simulation mode</h2>
+
+<table>
+  <tr><th>Can test ✅</th><th>Cannot test ⚠️</th></tr>
+  <tr><td>Schematron validation logic</td><td>Real PKI signing/verification</td></tr>
+  <tr><td>SBDH assembly and parsing</td><td>Certificate chain validation</td></tr>
+  <tr><td>AS4 message structure (SOAP + MIME)</td><td>Hostname verification against certificates</td></tr>
+  <tr><td>MDN receipt structure</td><td>Real DNS resolution (SML lookup)</td></tr>
+  <tr><td>Error handling (retry logic)</td><td>Network timeout behaviour</td></tr>
+  <tr><td>Transaction storage (mock store)</td><td>Real SMP metadata retrieval</td></tr>
+  <tr><td>Report generation (EUSR/TSR)</td><td>Interoperability with other APs</td></tr>
+  <tr><td>Full send/receive pipeline end-to-end</td><td>Peppol Testbed accreditation</td></tr>
+</table>
+
+<div class="callout">
+  <strong>🔑 Testing real PKI.</strong> When you get test certificates from OpenPeppol, switch to <code>npm start</code> and run the same test suite — the assertions should pass identically. The certificate tests (<code>test/certificates.test.js</code> if present) are the ones that need real certs and network access.
+</div>
+
+<h2>Switching from simulation to live</h2>
+
+<p>When you have test PKI certificates from OpenPeppol and are ready to run against the real Peppol network:</p>
+
+<pre><span class="cm"># 1. Place your test certificates in certs/</span>
+<span class="cm">#    (the exact path is configured via PEPPOL_CERT_PATH / PEPPOL_KEY_PATH env vars)</span>
+<span class="k">ls certs/</span>
+<span class="cm"># peppol-ap.crt  peppol-ap.key  sml-test.crt</span>
+
+<span class="cm"># 2. Set real network mode</span>
+<span class="k">export SIMULATION_MODE=false</span>
+<span class="k">export NODE_ENV=production</span>
+
+<span class="cm"># 3. Start in live mode</span>
+<span class="k">npm start</span>
+
+<span class="cm"># 4. Run the test suite against live network</span>
+<span class="k">npm test</span></pre>
+
+<div class="info">
+  <strong>💡 The AP Core is the same code in both modes.</strong> Only <code>src/simulation.js</code> changes behaviour. The validation, SBDH, AS4 message building, and receive pipeline are identical. Switching modes doesn't change correctness — it only changes whether the network calls are real or simulated.
+</div>
+
+<h2>Simulation in CI/CD</h2>
+
+<p>Run the simulation-based test suite in CI for every pull request — it's fast and requires no secrets:</p>
+
+<pre><span class="cm"># .github/workflows/test.yml (conceptual)</span>
+<span class="k">jobs:</span>
+  <span class="attr">test</span>:
+    <span class="attr">runs-on</span>: <span class="val">ubuntu-latest</span>
+    <span class="attr">steps</span>:
+      - <span class="attr">uses</span>: <span class="val">actions/checkout@v4</span>
+      - <span class="attr">uses</span>: <span class="val">actions/setup-node@v4</span>
+        <span class="attr">with</span>:
+          <span class="attr">node-version</span>: <span class="val">'22'</span>
+      - <span class="attr">run</span>: <span class="val">npm ci</span>
+      - <span class="attr">run</span>: <span class="val">npm run start:sim &</span>
+      - <span class="attr">run</span>: <span class="val">npm test</span>
+        <span class="attr">env</span>:
+          <span class="attr">SIMULATION_MODE</span>: <span class="val">'true'</span></pre>
+
+<h2>Advanced: Customising the simulator</h2>
+
+<h3>Adding a pre-seeded participant</h3>
+
+<p>Edit <code>src/simulator.js</code> and add to the <code>participants</code> map:</p>
+
+<pre><span class="k">export const</span> participants = <span class="k">new</span> Map([
+  [<span class="val">'9914:SK2023456789'</span>, { name: <span class="val">'Pekáreň Pod Hradom s.r.o.'</span>, country: <span class="val">'SK'</span> }],
+  [<span class="val">'9914:SK4498765432'</span>, { name: <span class="val">'Mesto Trnava'</span>, country: <span class="val">'SK'</span> }],
+  [<span class="val">'9914:SK5599887766'</span>, { name: <span class="val">'Test AP Slovakia'</span>, country: <span class="val">'SK'</span> }],
+  <span class="cm">// Add your own participants here</span>
+  [<span class="val">'9914:SK1122334455'</span>, { name: <span class="val">'Your Supplier s.r.o.'</span>, country: <span class="val">'SK'</span> }],
+])</pre>
+
+<h3>Simulating error responses</h3>
+
+<p>For testing retry logic and error handling, you can configure the simulator to return specific error responses:</p>
+
+<pre><span class="cm"># Set via environment variable — useful for chaos testing</span>
+<span class="k">SIMULATION_ERROR=certificate_expired npm run start:sim</span></pre>
+
+<p>The available error codes depend on what's implemented in <code>src/simulator.js</code> — check the <code>SIMULATION_ERROR_CODES</code> map there.</p>
+
+<h3>Injecting a custom AS4 message</h3>
+
+<p>For advanced testing, you can inject a manually crafted AS4 message directly into the receive pipeline via <code>POST /api/simulate/inject</code> with the <code>rawAS4</code> option:</p>
+
+<pre><span class="k">curl -s -X POST http://localhost:3001/api/simulate/inject \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rawAS4": "BASE64_ENCODED_AS4_MESSAGE",
+    "senderId": "9914:SK5599887766"
+  }'</pre>
+
+<hr>
+
+<h2>Summary</h2>
+
+<table>
+  <tr><th>Topic</th><th>Key point</th></tr>
+  <tr><td>Purpose</td><td>Develop and test the full pipeline without PKI certs or network access</td></tr>
+  <tr><td>Enabling</td><td><code>npm run start:sim</code> or <code>SIMULATION_MODE=true</code></td></tr>
+  <tr><td>What's real</td><td>Schematron validation, SBDH, AS4 message structure, MDN format, storage</td></tr>
+  <tr><td>What's fake</td><td>Network transport, PKI signing/encryption, SML/SMP lookups</td></tr>
+  <tr><td>Participant registry</td><td>In-memory map in <code>src/simulator.js</code>, resettable on restart</td></tr>
+  <tr><td>CLI tool</td><td><code>node server/simulate.js</code> for inbound, send, register, participants</td></tr>
+  <tr><td>Tests</td><td>All Vitest tests use simulation mode — fast, deterministic, CI-friendly</td></tr>
+  <tr><td>Switching to live</td><td>Set <code>SIMULATION_MODE=false</code>, add certs to <code>certs/</code>, run <code>npm start</code></td></tr>
+</table>
+
+<h2>Further reading</h2>
+
+<ul>
+  <li><a href="0005-hands-on-node42-and-validation.html">Lesson 5: Hands-on</a> — step-by-step walkthrough with the server running</li>
+  <li><a href="../reference/ap-core-interface.html">AP Core Interface</a> — the REST API reference for the dev server</li>
+  <li><code>src/simulation.js</code> — the simulation mode flag and state machine</li>
+  <li><code>src/simulator.js</code> — the simulated network, participants map, and fake MDN builder</li>
+  <li><code>test/regression/</code> — regression fixtures and the harness</li>
+</ul>
+
+<div class="footer">
+  <p>Lesson 12 of the Peppol Service Provider series. Focus: simulation mode, development workflow.</p>
+  <p>See also: <a href="0005-hands-on-node42-and-validation.html">Lesson 5: Hands-on</a> | <a href="0011-operational-procedures.html">Lesson 11: Operational Procedures</a></p>
+</div>
+
+</body>
+</html>

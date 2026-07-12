@@ -21,7 +21,7 @@ export const sampleInvoiceData = {
     countryCode: 'SK',
     vatID: 'SK2023456789',
     legalRegistrationName: 'Pekáreň Pod Hradom s.r.o.',
-    companyID: 'SK12345678',
+    companyID: 'SK2023456789', // BR-46: SK + 10 digits
   },
 
   buyer: {
@@ -34,8 +34,7 @@ export const sampleInvoiceData = {
     countryCode: 'SK',
     vatID: 'SK4498765432',
     legalRegistrationName: 'Mesto Trnava',
-    companyID: '00312316',
-    companyIDSchemeID: '0130',
+    companyID: 'SK4498765432', // BR-46: SK + 10 digits
   },
 
   payment: {
