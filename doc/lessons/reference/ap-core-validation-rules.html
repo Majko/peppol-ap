@@ -202,36 +202,49 @@
   </tr>
 </table>
 
-<h2>5. Conditional requirements (optional but required when...)</h2>
+<h2>5. Conditional requirements — implemented in Phase 22</h2>
+
+<div class="callout">
+  <strong>✅ Implemented:</strong> The following rules are enforced by the AP Core validator as of Phase 22.
+</div>
 
 <table>
   <tr><th>Condition</th><th>What becomes mandatory</th><th>Rule ID</th></tr>
   <tr>
     <td>If <code>BT-115</code> (PayableAmount) &gt; 0</td>
     <td>Either <code>BT-9</code> (DueDate) or <code>BT-20</code> (PaymentTerms/Note) must be present</td>
-    <td><span class="rule-id">PEPPOL-EN16931-R020</span></td>
+    <td><span class="rule-id">PEPPOL-EN16931-R020</span> ✅</td>
   </tr>
   <tr>
-    <td>If <code>InvoiceTypeCode</code> = 384 (corrected)</td>
+    <td>If <code>InvoiceTypeCode</code> = 383 or 384 (corrected / self-billed)</td>
     <td>A <code>BillingReference</code> to the original invoice is required (<code>BT-25</code>, <code>BT-26</code>)</td>
-    <td><span class="rule-id">PEPPOL-EN16931-R008</span></td>
+    <td><span class="rule-id">PEPPOL-EN16931-R008</span> ✅</td>
   </tr>
   <tr>
     <td>If a VAT breakdown has category <code>K</code> (IC supply)</td>
     <td>Actual delivery date (<code>BT-72</code>) or invoice period (<code>BG-14</code>) must be present</td>
-    <td><span class="rule-id">PEPPOL-EN16931-R042</span></td>
+    <td><span class="rule-id">PEPPOL-EN16931-R042</span> ✅</td>
   </tr>
   <tr>
     <td>If <code>BT-81</code> (PaymentMeansCode) is 30, 42, or 58 (credit transfer)</td>
     <td><code>BT-84</code> (IBAN) and <code>BT-86</code> (BIC) must be present</td>
-    <td><span class="rule-id">PEPPOL-EN16931-R050</span></td>
+    <td><span class="rule-id">PEPPOL-EN16931-R050</span> ✅</td>
   </tr>
   <tr>
     <td>If there are document-level allowances (<code>BG-20</code>) or charges (<code>BG-21</code>)</td>
     <td>Each must have a reason (<code>BT-97</code> or <code>BT-98</code>) and a VAT category</td>
-    <td><span class="rule-id">PEPPOL-EN16931-R055</span></td>
+    <td><span class="rule-id">PEPPOL-EN16931-R055</span> ✅</td>
+  </tr>
+  <tr>
+    <td>If there are document-level allowances or charges</td>
+    <td><code>BT-109</code> (TaxExclusiveAmount) = <code>BT-106</code> (LineExtensionAmount) − allowances + charges</td>
+    <td><span class="rule-id">PEPPOL-EN16931-R032</span> ✅</td>
   </tr>
 </table>
+
+<div class="callout callout-amber">
+  <strong>🟡 Still to implement:</strong> Full Peppol BIS 3.0 Schematron has ~60–80 rules. Next priorities: R003 (BT-3), R010/R011 (VAT breakdown consistency), R040/R041 (country matching), R053/R054 (unit code), DE-specific rules, SK-specific PASR rules.
+</div>
 
 <h2>6. Code list validations</h2>
 

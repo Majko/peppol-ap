@@ -319,7 +319,7 @@
     <td>4</td>
     <td><strong>Payload validation</strong></td>
     <td>AP validates the UBL payload against Schematron rules before accepting it.</td>
-    <td><span class="badge badge-green">✅</span> We have a 15-rule validator. May need to expand to full Peppol BIS 3.0 rule set.</td>
+    <td><span class="badge badge-green">✅</span> Validator expanded: 21 rules implemented (Phase 22). Covers type codes 383/386, R008, R020, R032, R042, R050, R055. Still to do: ~40–60 more BIS 3.0 rules + SK PASR rules.</td>
   </tr>
   <tr>
     <td>5</td>
@@ -343,13 +343,13 @@
 </ul>
 
 <div class="callout">
-  <strong>🔧 Technical gap to close before Testbed:</strong>
+  <strong>🔧 Technical gaps to close before Testbed:</strong>
   <ol>
-    <li>Remove <code>dryrun: true</code> in <code>src/as4/node42.js</code> (Slice 3)</li>
+    <li><del>Remove <code>dryrun: true</code> in <code>src/as4/node42.js</code></del> — done in Slice 3 (verify)</li>
     <li>Wire certificate loading from identity store (Slice 3)</li>
     <li>Implement and test the full AS4 receive endpoint (currently relies on Node42's receiver)</li>
-    <li>Expand UBL validator to cover all Peppol BIS Billing 3.0 rules (not just our 15 rules)</li>
-    <li>Add Slovakia-specific validation rules (SK VAT ID format, national extensions)</li>
+    <li>Expand UBL validator to cover all Peppol BIS Billing 3.0 rules (Phase 22 added 6 rules — more remain)</li>
+    <li>Add Slovakia-specific PASR validation rules (SK VAT ID format, national extensions)</li>
     <li>Implement proper error responses for all Testbed error scenarios</li>
   </ol>
   <p style="margin:0.5em 0 0 0"><strong>Estimated effort: 2–4 weeks of focused work</strong>, running in parallel with Streams A and B.</p>
@@ -500,8 +500,8 @@
   <tr>
     <td><strong>9.5.3 — Document Validation</strong></td>
     <td>Must ensure datasets sent on behalf of end users are <strong>technically correct and valid</strong> according to the relevant Peppol Dataset Type rules.</td>
-    <td>Our 15-rule validator is a good start but must be expanded to full BIS Billing 3.0 Schematron. Without it we risk sending invalid invoices and being non-compliant.</td>
-    <td><span class="badge" style="background:#f59e0b;">High</span></td>
+    <td>Phase 22 expanded the validator from 15 to 21 rules (R008, R020, R032, R042, R050, R055). Remaining: ~40–60 more BIS 3.0 rules and SK PASR rules. This is an ongoing effort.</td>
+    <td><span class="badge badge-amber">🟡</span> Partially done — ongoing</td>
   </tr>
   <tr>
     <td><strong>10.3 / 17.1 — Security</strong></td>
