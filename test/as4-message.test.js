@@ -2,7 +2,7 @@
  * Tests for AS4 Message module
  */
 import { describe, it, expect } from 'vitest';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { buildAS4Message, parseAS4Message, buildAS4Error, EbMSErrorCodes } from '../src/as4/message.js';
 import { buildSBDH } from '../src/as4/sbdh.js';
 import { generateInvoice } from '../src/ubl/generator.js';
@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 
 const AP_ID = 'POP000123';
 const RECEIVER_AP_ID = 'POP000456';
-const MESSAGE_ID = `uuid:${uuidv4()}@ap.mojafaktura.sk`;
+const MESSAGE_ID = `uuid:${randomUUID()}@ap.mojafaktura.sk`;
 const SIM_KEY_PATH = resolve(process.cwd(), 'test/fixtures/keys/sim-signing-key.pem');
 
 describe('AS4 Message', () => {

@@ -257,4 +257,4 @@ export async function generateMonthlyReport(config, transactions) {
   };
 }
 
-export default generateMonthlyReport;
+

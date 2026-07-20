@@ -12,8 +12,7 @@
  * + registerWebhook    - Set webhook callback
  */
 
-import { v4 as uuidv4 } from 'uuid';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { generateInvoice, generateCreditNote } from './ubl/generator.js';
 import { parseUBL } from './ubl/parser.js';
 import { validateUBL } from './ubl/validator.js';
@@ -100,7 +99,7 @@ function getDocTypeIdentifier(data, docType) {
  * Generate a Peppol message ID
  */
 function generateMessageId() {
-  return `uuid:${uuidv4()}@${config.apDomain}`;
+  return `uuid:${randomUUID()}@${config.apDomain}`;
 }
 
 // ── For backwards-compatible health endpoint (tx count) ──────────────────────────

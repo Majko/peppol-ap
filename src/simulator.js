@@ -16,8 +16,8 @@
  * in simulation mode. The key is at test/fixtures/keys/sim-signing-key.pem.
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import { readFileSync, existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { signXml, getSimSigningKeyPath } from './as4/message.js';
 
@@ -86,7 +86,7 @@ registerParticipant('0088:SK4498765432', {
  * from the receiving AP
  */
 export function generateMDNReceipt(originalMessageId, receiverApId = 'POP000999') {
-  const receiptMessageId = `uuid:${uuidv4()}@${receiverApId.toLowerCase()}.local`;
+  const receiptMessageId = `uuid:${randomUUID()}@${receiverApId.toLowerCase()}.local`;
   const timestamp = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
   return {
@@ -137,7 +137,7 @@ const inboundMessages = [];
  * Returns the sender/receiver metadata for processing
  */
 export function createInboundMessage({ senderId, receiverId, ublXml, senderApId = 'POP000999' }) {
-  const messageId = `uuid:${uuidv4()}@${senderApId.toLowerCase()}.local`;
+  const messageId = `uuid:${randomUUID()}@${senderApId.toLowerCase()}.local`;
   const timestamp = new Date().toISOString();
 
   return {
@@ -158,7 +158,7 @@ export async function buildInboundAS4Message({ senderId, receiverId, ublXml, sen
   const { buildAS4Message } = await import('./as4/message.js');
   const { parseUBL } = await import('./ubl/parser.js');
 
-  const messageId = `uuid:${uuidv4()}@${senderApId.toLowerCase()}.local`;
+  const messageId = `uuid:${randomUUID()}@${senderApId.toLowerCase()}.local`;
   const timestamp = new Date().toISOString();
   const docTypeUpper = documentType === 'credit_note' ? 'CreditNote' : 'Invoice';
   const ns = `urn:oasis:names:specification:ubl:schema:xsd:${docTypeUpper}-2`;
@@ -284,7 +284,7 @@ export async function simulateSend(senderId, receiverId, ublXml, documentType = 
   }
 
   // Generate receipt as if from receiver's AP
-  const messageId = `uuid:${uuidv4()}@sender.sim.local`;
+  const messageId = `uuid:${randomUUID()}@sender.sim.local`;
   const receipt = generateMDNReceipt(messageId, 'POP000999');
 
   return {

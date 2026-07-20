@@ -110,10 +110,5 @@ export function decryptPayload(soapEnvelope, privateKey) {
  * @returns {boolean}
  */
 export function isEncrypted(soapEnvelope) {
-  const doc = new DOMParser().parseFromString(soapEnvelope, 'text/xml');
-  const encryptedDatas = select(
-    "//*[local-name(.)='Body']/*[local-name(.)='EncryptedData' and namespace-uri(.)='" + XENC_NS + "']",
-    doc
-  );
-  return encryptedDatas && encryptedDatas.length > 0;
+  return soapEnvelope.includes('xenc:EncryptedData');
 }

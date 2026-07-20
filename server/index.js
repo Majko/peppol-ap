@@ -75,11 +75,6 @@ export function createApp() {
     res.json(health);
   });
 
-  app.get('/api/health/detailed', async (_req, res) => {
-    const health = await apCore.getHealth();
-    res.json(health);
-  });
-
   app.get('/api/health/certs', async (_req, res) => {
     try {
       const warningDays = parseInt(_req.query.warningDays ?? '30', 10);
